@@ -7,7 +7,7 @@ import pandas as pd
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("key.json", scope)
 client = gspread.authorize(creds)
-sheet = client.open("Quan Ly Ky Gui").sheet1
+sheet = client.open_by_key("19E9yyhhzLG58UpCU1Y4HAJsFWxG4AoGtGWVi_DkyQdk").sheet1
 
 st.set_page_config(page_title="Quản Lý Nhà Đất", layout="wide")
 st.title("🏠 Hệ Thống Ký Gửi Nhà Đất")
