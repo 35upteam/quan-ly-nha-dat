@@ -3,11 +3,17 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 
-# Kết nối Google Sheets
+# Lấy dữ liệu từ mục Secrets của Streamlit
+creds_dict = st.secrets["gcp_service_account"]
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("key.json", scope)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
-sheet = client.open_by_key("19E9yyhhzLG58UpCU1Y4HAJsFWxG4AoGtGWVi_DkyQdk").sheet1
+
+# Mở file Google Sheet bằng ID
+SHEET_ID = "19E9yyhhzLG58UpCU1Y4HAJsFWxG4AoGtGWVi_DkyQdk"
+sheet = client.open_by_key(SHEET_ID).sheet1
+
+# ... (các phần giao diện bên dưới giữ nguyên) ...
 
 st.set_page_config(page_title="Quản Lý Nhà Đất", layout="wide")
 st.title("🏠 Hệ Thống Ký Gửi Nhà Đất")
