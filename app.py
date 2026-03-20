@@ -107,7 +107,7 @@ def show_dt(row, ks):
                 with cn:
                     if st.button("Hủy", use_container_width=True, key=f"no_{mid}"):
                         st.session_state[ck] = False; st.rerun()
-        st.code(f"Mã: {mid if is_adm else 'Ẩn'}")
+        st.code(f"Mã Căn: {mid if is_adm else 'Ẩn'}")
 
 # --- GIAO DIỆN CHÍNH ---
 head_c1, head_c2 = st.columns([6, 4], vertical_alignment="center")
