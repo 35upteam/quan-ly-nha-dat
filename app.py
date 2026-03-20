@@ -3,13 +3,14 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import requests, base64, time
+from PIL import Image # THÊM THƯ VIỆN NÀY
+import io
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
 # --- DANH SÁCH CỐ ĐỊNH ---
 LIST_PK = ["S", "GS", "SA", "VIC", "Sola", "Imper", "Tonkin", "Canopy", "Masteri", "Lumier"]
 LIST_LH = ["Studio", "1N", "1N+", "2N", "2N+", "3N"]
-# Thêm danh sách lựa chọn cho các trường mới
 LIST_TANG = ["Thấp", "Trung", "Cao"]
 LIST_NT = ["Nguyên bản", "Cơ bản", "Đầy đủ nội thất"]
 LIST_HBC = ["Đông", "Tây", "Nam", "Bắc", "Đông Nam", "Đông Bắc", "Tây Nam", "Tây Bắc"]
@@ -21,18 +22,29 @@ L_GIA, L_HT, L_TT, L_IMG = "Giá bán", "Hiện trạng", "Trạng thái", "Link
 L_TYPE, L_GC = "Phân loại", "Ghi chú"
 V_SOLD, V_RENT = "Đã bán", "Đã thuê"
 
-# --- HÀM TRỢ GIÚP ---
+# --- HÀM TRỢ GIÚP (ĐÃ CẬP NHẬT NÉN ẢNH) ---
 def up_img(fs):
     if not fs: return ""
     try:
         ak = st.secrets.get("imgbb_api_key")
         res = []
         for f in fs:
-            f.seek(0); b6 = base64.b64encode(f.read()).decode('utf-8')
+            f.seek(0)
+            img = Image.open(f)
+            # Chuyển hệ màu nếu là ảnh PNG có lớp trong suốt (tránh lỗi khi lưu JPEG)
+            if img.mode in ("RGBA", "P"): img = img.convert("RGB")
+            
+            # Nén ảnh: Giảm kích thước và chất lượng (quality=70)
+            out = io.BytesIO()
+            img.save(out, format="JPEG", quality=70, optimize=True)
+            b6 = base64.b64encode(out.getvalue()).decode('utf-8')
+            
             r = requests.post("https://api.imgbb.com/1/upload", {"key": ak, "image": b6}, timeout=20)
             if r.status_code == 200: res.append(r.json()['data']['url'])
         return ",".join(res)
-    except: return ""
+    except Exception as e:
+        print(f"Lỗi upload: {e}")
+        return ""
 
 def change_img(step, total):
     st.session_state.ci = (st.session_state.get('ci', 0) + step) % total
@@ -158,30 +170,31 @@ if sh_obj is not None and not df_raw.empty:
                 with i1:
                     v_lh = st.selectbox(L_LH, LIST_LH, placeholder="Lựa chọn")
                     v_ma = st.text_input(L_MA)
-                    v_tang = st.selectbox(L_TANG, LIST_TANG, placeholder="Lựa chọn") # MỚI
+                    v_tang = st.selectbox(L_TANG, LIST_TANG, placeholder="Lựa chọn")
                 with i2:
                     v_pk = st.selectbox(L_PK, LIST_PK, placeholder="Lựa chọn")
                     v_dt = st.number_input(L_DT, 0.0)
-                    v_nt = st.selectbox(L_NT, LIST_NT, placeholder="Lựa chọn") # MỚI
+                    v_nt = st.selectbox(L_NT, LIST_NT, placeholder="Lựa chọn")
                 with i3:
                     v_gi = st.number_input(L_GIA, step=0.1)
-                    v_hbc = st.selectbox(L_HBC, LIST_HBC, placeholder="Lựa chọn") # MỚI
+                    v_hbc = st.selectbox(L_HBC, LIST_HBC, placeholder="Lựa chọn")
                     v_ht = st.selectbox(L_HT, ["Đang ở", "Để trống", "Cho thuê"])
                 v_gc = st.text_input(L_GC); up = st.file_uploader("Ảnh", accept_multiple_files=True)
                 if st.form_submit_button("🚀 ĐĂNG CĂN"):
                     if v_ma:
                         imgs = up_img(up)
                         try:
-                            h = list(df_raw.columns); row_d = [""] * len(h)
-                            # Cập nhật thêm các trường mới vào Dictionary
+                            h = [col.strip() for col in df_raw.columns if col != 'sheet_row']
+                            row_d = [""] * len(h)
                             dm = {L_TYPE:tp, L_DATE:str(pd.Timestamp.now().date()), L_LH:v_lh, 
-                                  L_PK:v_pk, L_MA:v_ma, L_DT:v_dt, L_GIA:v_gi, L_HT:v_ht, 
+                                  L_PK:v_pk, L_MA:v_ma, L_DT:str(v_dt), L_GIA:str(v_gi), L_HT:v_ht, 
                                   L_GC:v_gc, L_TT:"Đang bán", L_IMG:imgs,
-                                  L_TANG:v_tang, L_NT:v_nt, L_HBC:v_hbc} # GỬI DỮ LIỆU MỚI
+                                  L_TANG:v_tang, L_NT:v_nt, L_HBC:v_hbc}
                             for i, col in enumerate(h):
                                 if col in dm: row_d[i] = dm[col]
-                            sh_obj.append_row(row_d); st.cache_resource.clear(); st.rerun()
-                        except: st.error("Lỗi Sheets")
+                            sh_obj.append_row(row_d)
+                            st.cache_resource.clear(); st.success("Đăng thành công!"); time.sleep(1); st.rerun()
+                        except Exception as e:
+                            st.error(f"Lỗi Sheets: {e}")
         else:
             st.warning("### 🔐 Khu vực dành cho quản trị viên")
-            st.info("Chào bạn, chức năng Thêm hàng chỉ dành cho tài khoản Admin.")
