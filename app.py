@@ -74,4 +74,79 @@ def show_dt(row, ks):
                 st.warning("Xác nhận chốt?"); cy, cn = st.columns(2)
                 with cy:
                     if st.button("OK", type="primary", use_container_width=True, key=f"ok_{mid}"):
-                        c_idx = list(df_raw.columns).index(L
+                        c_idx = list(df_raw.columns).index(L_TT) + 1
+                        sh_obj.update_cell(int(row['sheet_row']), c_idx, V_SOLD if ks=="B" else V_RENT)
+                        st.session_state[ck] = False; st.cache_resource.clear(); st.rerun()
+                with cn:
+                    if st.button("Hủy", use_container_width=True, key=f"no_{mid}"):
+                        st.session_state[ck] = False; st.rerun()
+        st.code(f"Mã: {mid if is_adm else 'Ẩn'}")
+
+# --- GIAO DIỆN CHÍNH ---
+h1, h2 = st.columns([7, 3])
+with h1: st.title("🏢 Vinhomes Manager")
+with h2:
+    if not is_adm:
+        p = st.text_input("Admin", type="password", label_visibility="collapsed", key="login_pass")
+        if p == "admin123": st.session_state.is_login = True; st.rerun()
+    else:
+        st.info("✅ Admin")
+        ca1, ca2 = st.columns(2)
+        with ca1:
+            if st.button("Ref", key="btn_ref"): st.cache_resource.clear(); st.rerun()
+        with ca2:
+            if st.button("Out", key="btn_out"): st.session_state.is_login = False; st.rerun()
+
+if sh_obj is not None and not df_raw.empty:
+    t1, t2, t3 = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
+    
+    def draw(df_in, ks):
+        df_a = df_in[~df_in[L_TT].astype(str).str.contains("Đã", na=False)]
+        c1, c2, c3 = st.columns([3, 3, 4])
+        with c1: pk = st.multiselect("Phân khu", sorted(df_in[L_PK].unique()), key=f"p{ks}")
+        with c2: lh = st.multiselect("Loại hình", sorted(df_in[L_LH].unique()), key=f"l{ks}")
+        with c3:
+            mi, ma = float(df_in[L_GIA].min()), float(df_in[L_GIA].max())
+            r_gia = st.slider("Giá (Tỷ)", mi, ma, (mi, ma), key=f"g{ks}")
+        
+        if pk: df_a = df_a[df_a[L_PK].isin(pk)]
+        if lh: df_a = df_a[df_a[L_LH].isin(lh)]
+        df_a = df_a[(df_a[L_GIA] >= r_gia[0]) & (df_a[L_GIA] <= r_gia[1])]
+        
+        # --- DÒNG ĐẾM CHỈNH SỬA DUY NHẤT Ở ĐÂY ---
+        st.markdown(f"<div style='padding: 15px 0px; font-weight: bold; font-size: 17px;'>🔍 Đang hiển thị: {len(df_a)} căn hộ phù hợp</div>", unsafe_allow_html=True)
+        
+        v_cols = [L_DATE, L_LH, L_PK, L_DT, L_GIA, L_TT]
+        if is_adm: v_cols.append(L_MA)
+        sel = st.dataframe(df_a[v_cols], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row", key=f"df{ks}")
+        if sel and sel.selection.rows:
+            st.session_state.ci = 0 # Trả về đúng cấu trúc v23.7
+            show_dt(df_a.iloc[sel.selection.rows[0]], ks)
+
+    with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Bán|Ban", na=False)], "B")
+    with t2: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Thuê|Thue", na=False)], "T")
+    with t3:
+        if is_adm:
+            with st.form("f_add", clear_on_submit=True):
+                tp = st.radio("Loại", ["Bán", "Cho thuê"], horizontal=True)
+                i1, i2, i3 = st.columns(3)
+                with i1:
+                    v_lh = st.selectbox(L_LH, ["Studio", "1PN+", "2PN", "2PN+", "3N"])
+                    v_ma = st.text_input(L_MA)
+                with i2:
+                    v_pk = st.selectbox(L_PK, ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
+                    v_dt = st.number_input(L_DT, 0.0)
+                with i3:
+                    v_gi = st.number_input(L_GIA, step=0.1)
+                    v_ht = st.selectbox(L_HT, ["Đang ở", "Để trống", "Cho thuê"])
+                v_gc = st.text_input(L_GC); up = st.file_uploader("Ảnh", accept_multiple_files=True)
+                if st.form_submit_button("🚀 ĐĂNG CĂN"):
+                    if v_ma:
+                        imgs = up_img(up)
+                        try:
+                            h = list(df_raw.columns); row_d = [""] * len(h)
+                            dm = {L_TYPE:tp, L_DATE:str(pd.Timestamp.now().date()), L_LH:v_lh, L_PK:v_pk, L_MA:v_ma, L_DT:v_dt, L_GIA:v_gi, L_HT:v_ht, L_GC:v_gc, L_TT:"Đang bán", L_IMG:imgs}
+                            for i, col in enumerate(h):
+                                if col in dm: row_d[i] = dm[col]
+                            sh_obj.append_row(row_d); st.cache_resource.clear(); st.rerun()
+                        except: st.error("Lỗi Sheets")
