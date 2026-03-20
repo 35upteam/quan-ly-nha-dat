@@ -4,12 +4,23 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import requests, base64
 
-st.set_page_config(page_title="Vinhomes Manager", layout="wide")
+st.set_page_config(page_title="Vinhomes", layout="wide")
 
 # NHÃN CỘT
-L_DATE, L_LH, L_PK, L_MA = "Ngày lên hàng", "Loại hình", "Phân khu", "Mã căn"
-L_DT, L_TANG, L_NT, L_HBC = "Diện tích", "Khoảng tầng", "Nội thất", "Hướng BC"
-L_GIA, L_HT, L_TT, L_IMG, L_TYPE, L_GC = "Giá bán", "Hiện trạng", "Trạng thái", "Link ảnh", "Phân loại", "Ghi chú"
+L_DATE = "Ngày lên hàng"
+L_LH = "Loại hình"
+L_PK = "Phân khu"
+L_MA = "Mã căn"
+L_DT = "Diện tích"
+L_TANG = "Khoảng tầng"
+L_NT = "Nội thất"
+L_HBC = "Hướng BC"
+L_GIA = "Giá bán"
+L_HT = "Hiện trạng"
+L_TT = "Trạng thái"
+L_IMG = "Link ảnh"
+L_TYPE = "Phân loại"
+L_GC = "Ghi chú"
 
 def up_img(fs):
     if not fs: return ""
@@ -17,9 +28,11 @@ def up_img(fs):
         ak = st.secrets.get("imgbb_api_key") or st.secrets.get("gcp_service_account", {}).get("imgbb_api_key")
         res = []
         for f in fs:
-            f.seek(0); b6 = base64.b64encode(f.read()).decode('utf-8')
+            f.seek(0)
+            b6 = base64.b64encode(f.read()).decode('utf-8')
             r = requests.post("https://api.imgbb.com/1/upload", {"key": ak, "image": b6}, timeout=20)
-            if r.status_code == 200: res.append(r.json()['data']['thumb']['url']) 
+            if r.status_code == 200:
+                res.append(r.json()['data']['thumb']['url']) 
         return ",".join(res)
     except: return ""
 
@@ -37,19 +50,4 @@ def load_data():
         cols = [h.strip() for h in r[0]]
         df = pd.DataFrame(r[1:], columns=cols)
         df['sheet_row'] = range(2, len(df) + 2)
-        df[L_GIA] = pd.to_numeric(df[L_GIA], errors='coerce').fillna(0)
-        return df.iloc[::-1].reset_index(drop=True), sh
-    except: return pd.DataFrame(), None
-
-df_raw, sh_obj = load_data()
-if 'is_login' not in st.session_state: st.session_state.is_login = False
-
-# --- HEADER ---
-h1, h2 = st.columns([7, 3])
-with h1: st.title("🏢 Vinhomes Manager")
-with h2:
-    if not st.session_state.is_login:
-        p = st.text_input("Mật khẩu", type="password", label_visibility="collapsed")
-        if p == "admin123": st.session_state.is_login = True; st.rerun()
-    else:
-        st.info("✅ Ch
+        df[L_GIA] = pd.to_numeric(
