@@ -109,8 +109,7 @@ with head_c2:
                 else:
                     st.toast("Sai mật khẩu!", icon="❌")
     else:
-        # CÁCH CHÈN LỜI CHÀO AN TOÀN NHẤT
-        st.write(f"👋 **Chào Admin Ninh!**") # In ra dòng chữ riêng biệt trước khi tạo cột nút
+        st.write(f"👋 **Chào Admin Ninh!**")
         ca1, ca2 = st.columns([1, 1], vertical_alignment="center")
         with ca1:
             if st.button("🔄 Làm mới", key="btn_ref", use_container_width=True): 
@@ -141,8 +140,12 @@ if sh_obj is not None and not df_raw.empty:
         v_cols = [L_DATE, L_LH, L_PK, L_DT, L_GIA, L_TT]
         if is_adm: v_cols.append(L_MA)
         sel = st.dataframe(df_a[v_cols], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row", key=f"df{ks}")
+        
+        # SỬA LỖI TẠI ĐÂY: Kiểm tra dòng được chọn có hợp lệ với dữ liệu hiện tại không
         if sel and sel.selection.rows:
-            st.session_state.ci = 0; show_dt(df_a.iloc[sel.selection.rows[0]], ks)
+            idx = sel.selection.rows[0]
+            if idx < len(df_a): # Đảm bảo index không vượt quá độ dài danh sách hiện tại
+                st.session_state.ci = 0; show_dt(df_a.iloc[idx], ks)
 
     with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Bán|Ban", na=False)], "B")
     with t2: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Thuê|Thue", na=False)], "T")
