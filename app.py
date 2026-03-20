@@ -6,24 +6,38 @@ import requests, base64
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
-# KHAI BÁO NHÃN
+# NHÃN CỘT
 L_DATE = "Ngày" + " lên" + " hàng"
 L_LH = "Loại" + " hình"
 L_PK = "Phân" + " khu"
 L_MA = "Mã" + " căn"
 L_DT = "Diện" + " tích"
-L_TANG = "Khoảng" + " tầng"
-L_NT = "Nội" + " thất"
-L_HBC = "Hướng" + " BC"
 L_GIA = "Giá" + " bán"
-L_HT = "Hiện" + " trạng"
 L_TT = "Trạng" + " thái"
 L_IMG = "Link" + " ảnh"
 L_TYPE = "Phân" + " loại"
 L_GC = "Ghi" + " chú"
+L_HT = "Hiện" + " trạng"
 
 V_SOLD = "Đã" + " bán"
 V_RENT = "Đã" + " thuê"
+
+# --- CÁC HÀM XỬ LÝ NGẮN GỌN (CHỐNG NGẮT DÒNG) ---
+def next_img():
+    st.session_state.ci += 1
+    st.rerun()
+
+def prev_img():
+    st.session_state.ci -= 1
+    st.rerun()
+
+def set_chot(k):
+    st.session_state[k] = True
+    st.rerun()
+
+def cancel_chot(k):
+    st.session_state[k] = False
+    st.rerun()
 
 def up_img(fs):
     if not fs: return ""
@@ -54,7 +68,7 @@ df_raw, sh_obj = load_data()
 if 'is_login' not in st.session_state: st.session_state.is_login = False
 is_adm = st.session_state.is_login
 
-# --- HEADER ---
+# HEADER
 h1, h2 = st.columns([7, 3])
 with h1: st.title("🏢 Vinhomes Manager")
 with h2:
@@ -62,43 +76,40 @@ with h2:
         p = st.text_input("Admin", type="password", label_visibility="collapsed")
         if p == "admin123": st.session_state.is_login = True; st.rerun()
     else:
-        st.info("✅ Admin Mode")
+        st.info("✅ Admin")
         ca1, ca2 = st.columns(2)
         with ca1:
-            if st.button("🔄 Ref"): st.cache_resource.clear(); st.rerun()
+            if st.button("Ref"): st.cache_resource.clear(); st.rerun()
         with ca2:
-            if st.button("❌ Out"): st.session_state.is_login = False; st.rerun()
+            if st.button("Out"): st.session_state.is_login = False; st.rerun()
 
 if sh_obj is not None and not df_raw.empty:
-    t1, t2, t3 = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
+    t1, t2, t3 = st.tabs(["🔴 Bán", "🟢 Thuê", "➕ Thêm"])
     
     def draw(df_in, ks):
         df_a = df_in[~df_in[L_TT].astype(str).str.contains("Đã", na=False)]
         if df_a.empty: st.info("Trống."); return
         
-        st.markdown("### 🔍 Tìm & Lọc")
         s_ma = ""
-        if is_adm: s_ma = st.text_input("Tìm Mã căn (Admin)...", key=f"s{ks}").strip()
+        if is_adm: s_ma = st.text_input("Tìm Mã căn...", key=f"s{ks}").strip()
         
         c1, c2, c3 = st.columns([3, 3, 4])
-        with c1: pk = st.multiselect("Phân khu", sorted(df_in[L_PK].unique()), key=f"p{ks}")
-        with c2: lh = st.multiselect("Loại hình", sorted(df_in[L_LH].unique()), key=f"l{ks}")
+        with c1: pk = st.multiselect("Khu", sorted(df_in[L_PK].unique()), key=f"p{ks}")
+        with c2: lh = st.multiselect("Loại", sorted(df_in[L_LH].unique()), key=f"l{ks}")
         with c3:
             mi, ma = float(df_in[L_GIA].min()), float(df_in[L_GIA].max())
-            r_gia = st.slider("Giá (Tỷ)", mi, ma, (mi, ma), key=f"g{ks}")
+            r_gia = st.slider("Giá", mi, ma, (mi, ma), key=f"g{ks}")
         
-        if is_adm and s_ma: 
-            df_a = df_a[df_a[L_MA].astype(str).str.contains(s_ma, case=False, na=False)]
+        if is_adm and s_ma: df_a = df_a[df_a[L_MA].astype(str).str.contains(s_ma, case=False)]
         if pk: df_a = df_a[df_a[L_PK].isin(pk)]
         if lh: df_a = df_a[df_a[L_LH].isin(lh)]
         df_a = df_a[(df_a[L_GIA] >= r_gia[0]) & (df_a[L_GIA] <= r_gia[1])]
 
         v_cols = [L_DATE, L_LH, L_PK, L_DT, L_GIA, L_TT]
         if is_adm: v_cols.append(L_MA)
-        
         sel = st.dataframe(df_a[v_cols], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row", key=f"df{ks}")
 
-        @st.dialog("Chi tiết căn hộ")
+        @st.dialog("Chi tiết")
         def show_dt(row):
             mid = str(row.get(L_MA, "0"))
             cl1, cl2 = st.columns([1.2, 1])
@@ -110,6 +121,57 @@ if sh_obj is not None and not df_raw.empty:
                     if len(imgs) > 1:
                         b1, b2 = st.columns(2)
                         with b1:
-                            if st.button("⬅️", key=f"p_{mid}_{ks}"): st.session_state.ci -= 1; st.rerun()
+                            if st.button("⬅️", key=f"p_{mid}"): prev_img()
                         with b2:
-                            if st.button("➡️", key=f"n_{mid}_{ks}"): st.session_state.
+                            if st.button("➡️", key=f"n_{mid}"): next_img()
+                else: st.info("Không ảnh")
+            with cl2:
+                st.subheader(f"{row[L_LH]} - {row[L_PK]}")
+                st.success(f"{row[L_GIA]} Tỷ")
+                if is_adm:
+                    st.divider(); ck = f"ck_{mid}"
+                    if ck not in st.session_state: st.session_state[ck] = False
+                    if not st.session_state[ck]:
+                        if st.button("✅ CHỐT", use_container_width=True, key=f"bt_{mid}"): set_chot(ck)
+                    else:
+                        st.warning("Chốt?"); cy, cn = st.columns(2)
+                        with cy:
+                            if st.button("OK", use_container_width=True, key=f"ok_{mid}"):
+                                try:
+                                    c_idx = list(df_raw.columns).index(L_TT) + 1
+                                    sh_obj.update_cell(int(row['sheet_row']), c_idx, V_SOLD if ks=="B" else V_RENT)
+                                    st.session_state[ck] = False; st.cache_resource.clear(); st.rerun()
+                                except: st.error("Lỗi")
+                        with cn:
+                            if st.button("Hủy", use_container_width=True, key=f"no_{mid}"): cancel_chot(ck)
+                st.code(f"Mã: {mid if is_adm else 'Ẩn'}\nGhi chú: {row.get(L_GC, '')}")
+        
+        if sel and sel.selection.rows: st.session_state.ci = 0; show_dt(df_a.iloc[sel.selection.rows[0]])
+
+    with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Bán|Ban|bán|ban", na=False)], "B")
+    with t2: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Thuê|Thue|thuê|thue", na=False)], "T")
+    with t3:
+        if is_adm:
+            with st.form("f_add", clear_on_submit=True):
+                tp = st.radio("Loại", ["Bán", "Cho thuê"], horizontal=True)
+                i1, i2, i3 = st.columns(3)
+                with i1:
+                    v_lh = st.selectbox(L_LH, ["Studio", "1PN+", "2PN", "2PN+", "3N"])
+                    v_ma = st.text_input(L_MA)
+                with i2:
+                    v_pk = st.selectbox(L_PK, ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
+                    v_dt = st.number_input(L_DT, 0.0)
+                with i3:
+                    v_gi = st.number_input(L_GIA, step=0.1)
+                    v_ht = st.selectbox(L_HT, ["Đang ở", "Để trống", "Cho thuê"])
+                v_gc = st.text_input(L_GC); up = st.file_uploader("Ảnh", accept_multiple_files=True)
+                if st.form_submit_button("🚀 ĐĂNG"):
+                    if v_ma:
+                        imgs = up_img(up)
+                        try:
+                            h = list(df_raw.columns); row_d = [""] * len(h)
+                            dm = {L_TYPE:tp, L_DATE:str(pd.Timestamp.now().date()), L_LH:v_lh, L_PK:v_pk, L_MA:v_ma, L_DT:v_dt, L_GIA:v_gi, L_HT:v_ht, L_GC:v_gc, L_TT:"Đang bán", L_IMG:imgs}
+                            for i, col in enumerate(h):
+                                if col in dm: row_d[i] = dm[col]
+                            sh_obj.append_row(row_d); st.cache_resource.clear(); st.rerun()
+                        except: st.error("Lỗi")
