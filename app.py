@@ -6,7 +6,7 @@ import requests, base64, time
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
-# --- KHAI BÁO NHÃN ---
+# --- NHÃN CỘT ---
 L_DATE, L_LH, L_PK, L_MA = "Ngày lên hàng", "Loại hình", "Phân khu", "Mã căn"
 L_DT, L_TANG, L_NT, L_HBC = "Diện tích", "Khoảng tầng", "Nội thất", "Hướng BC"
 L_GIA, L_HT, L_TT, L_IMG = "Giá bán", "Hiện trạng", "Trạng thái", "Link ảnh"
@@ -92,14 +92,25 @@ def show_dt(row, ks):
                         st.session_state[ck] = False; st.rerun()
         st.code(f"Mã: {mid if is_adm else 'Ẩn'}")
 
-# --- GIAO DIỆN CHÍNH ---
-st.title("🏢 Vinhomes Manager")
-if not is_adm:
-    p = st.text_input("Admin", type="password")
-    if p == "admin123": st.session_state.is_login = True; st.rerun()
-else:
-    if st.button("Thoát Admin"): st.session_state.is_login = False; st.rerun()
+# --- GIAO DIỆN CHÍNH (KHÔI PHỤC HEADER CŨ) ---
+h1, h2 = st.columns([7, 3])
+with h1: 
+    st.title("🏢 Vinhomes Manager")
+with h2:
+    if not is_adm:
+        # Ô nhập pass nằm gọn bên phải header
+        p = st.text_input("Admin", type="password", label_visibility="collapsed")
+        if p == "admin123": 
+            st.session_state.is_login = True; st.rerun()
+    else:
+        st.info("✅ Admin")
+        ca1, ca2 = st.columns(2)
+        with ca1:
+            if st.button("Ref"): st.cache_resource.clear(); st.rerun()
+        with ca2:
+            if st.button("Out"): st.session_state.is_login = False; st.rerun()
 
+# --- PHẦN TABS VÀ DANH SÁCH ---
 if sh_obj is not None and not df_raw.empty:
     t1, t2, t3 = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
     
