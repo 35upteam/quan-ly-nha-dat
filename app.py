@@ -5,7 +5,7 @@ import pandas as pd
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
-# --- DANH MỤC DỮ LIỆU (Giữ nguyên đầy đủ) ---
+# --- DANH MỤC DỮ LIỆU ---
 PK_L = ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"]
 LH_L = ["Studio", "1PN+", "2PN", "2PN+", "3N"]
 H_L = ["Đông", "Tây", "Nam", "Bắc", "Đông Bắc", "Đông Nam", "Tây Bắc", "Tây Nam"]
@@ -48,7 +48,7 @@ with h2:
         st.markdown("<p style='text-align:right;color:green;font-size:12px;margin:0;'>Admin Mode ✅</p>", unsafe_allow_html=True)
 
 # --- DIALOG CHI TIẾT ---
-@st.dialog("📋 Thông tin chi tiết", width="large")
+@st.dialog("📋 Chi tiết căn hộ", width="large")
 def show_dt(row, adm):
     c_img, c_txt = st.columns([1, 1])
     with c_img:
@@ -61,9 +61,9 @@ def show_dt(row, adm):
         st.markdown(f"### 💰 Giá: {row.get('Giá bán', 0):.2f} Tỷ")
         if adm: st.error(f"🔑 MÃ CĂN: {row.get('Mã căn')}")
         st.divider()
-        t = f"🏢 CĂN HỘ VINHOMES SMART CITY\n📍 Phân khu: {row.get('Phân khu')}\n"
+        t = f"🏢 VINHOMES SMART CITY\n📍 Phân khu: {row.get('Phân khu')}\n"
         t += f"✨ Loại hình: {row.get('Loại hình')}\n📐 Diện tích: {row.get('Diện tích')} m2\n"
-        t += f"💰 Giá bán: {row.get('Giá bán')} Tỷ\n📞 Liên hệ xem nhà ngay!"
+        t += f"💰 Giá: {row.get('Giá bán', 0):.2f} Tỷ\n📞 Liên hệ xem nhà ngay!"
         st.code(t, language="text")
 
 # --- GIAO DIỆN CHÍNH ---
@@ -85,27 +85,51 @@ if sh_obj is not None:
         d_df = df.copy()
         if 'Mã căn' in d_df.columns: d_df = d_df.drop(columns=['Mã căn'])
         
-        st.info(f"💡 Tìm thấy {len(df)} căn. Nhấn vào dòng để xem chi tiết.")
+        st.write(f"🔍 Tìm thấy {len(df)} căn.")
         sel = st.dataframe(d_df, use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row")
         if sel and sel.selection.rows:
             show_dt(df.iloc[sel.selection.rows[0]], is_adm)
 
     with t2:
         if is_adm:
-            with st.form("form_add_day_du", clear_on_submit=True):
-                st.write("### 📝 Nhập đầy đủ thông tin căn hộ")
+            with st.form("form_add_v3", clear_on_submit=True):
+                st.write("### 📝 Nhập thông tin căn hộ mới")
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    n_ngay = st.date_input("Ngày lên hàng")
-                    n_loai = st.selectbox("Loại hình căn hộ", LH_L)
-                    n_pk = st.selectbox("Phân khu dự án", PK_L)
+                    v_ngay = st.date_input("Ngày lên hàng")
+                    v_loai = st.selectbox("Loại hình", LH_L)
+                    v_pk = st.selectbox("Phân khu", PK_L)
                 with c2:
-                    n_ma = st.text_input("Mã căn (Bảo mật)")
-                    n_dt = st.number_input("Diện tích thực tế (m2)", 0.0, step=0.1)
-                    n_tg = st.selectbox("Khoảng tầng", TG_L)
+                    v_ma = st.text_input("Mã căn (Bảo mật)")
+                    v_dt = st.number_input("Diện tích (m2)", 0.0, step=0.1)
+                    v_tg = st.selectbox("Khoảng tầng", TG_L)
                 with c3:
-                    n_nt = st.selectbox("Tình trạng nội thất", NT_L)
-                    n_hbc = st.selectbox("Hướng ban công", H_L)
-                    n_gia = st.number_input("Giá bán chốt (Tỷ)", 0.0, step=0.01)
+                    v_nt = st.selectbox("Nội thất", NT_L)
+                    v_hbc = st.selectbox("Hướng ban công", H_L)
+                    v_gia = st.number_input("Giá bán (Tỷ)", 0.0, step=0.01)
                 
-                n_anh = st.text
+                v_anh = st.text_input("Link ảnh")
+                
+                # NÚT SUBMIT - PHẢI NẰM TRONG KHỐI LỆNH 'WITH ST.FORM'
+                btn_save = st.form_submit_button("🚀 Xác nhận lưu hàng")
+                
+                if btn_save:
+                    try:
+                        headers = [x.strip() for x in sh_obj.row_values(1)]
+                        new_row = [""] * len(headers)
+                        data_map = {
+                            "Ngày lên hàng": str(v_ngay), "Loại hình": v_loai,
+                            "Phân khu": v_pk, "Mã căn": v_ma, "Diện tích": v_dt,
+                            "Khoảng tầng": v_tg, "Nội thất": v_nt, "Hướng BC": v_hbc,
+                            "Giá bán": v_gia, "Link ảnh": v_anh, "Trạng thái": "Đang bán"
+                        }
+                        for i, col in enumerate(headers):
+                            if col in data_map: new_row[i] = data_map[col]
+                        
+                        sh_obj.append_row(new_row)
+                        st.success("✅ Đã lưu thành công!")
+                        st.cache_resource.clear()
+                    except Exception as e:
+                        st.error(f"Lỗi: {e}")
+        else:
+            st.warning("🔒 Nhập mật khẩu Admin để thêm hàng.")
