@@ -3,7 +3,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import requests, base64, time
-from PIL import Image # THÊM THƯ VIỆN NÀY
+from PIL import Image
 import io
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
@@ -22,7 +22,7 @@ L_GIA, L_HT, L_TT, L_IMG = "Giá bán", "Hiện trạng", "Trạng thái", "Link
 L_TYPE, L_GC = "Phân loại", "Ghi chú"
 V_SOLD, V_RENT = "Đã bán", "Đã thuê"
 
-# --- HÀM TRỢ GIÚP (ĐÃ CẬP NHẬT NÉN ẢNH) ---
+# --- HÀM TRỢ GIÚP (NÉN ẢNH) ---
 def up_img(fs):
     if not fs: return ""
     try:
@@ -31,20 +31,14 @@ def up_img(fs):
         for f in fs:
             f.seek(0)
             img = Image.open(f)
-            # Chuyển hệ màu nếu là ảnh PNG có lớp trong suốt (tránh lỗi khi lưu JPEG)
             if img.mode in ("RGBA", "P"): img = img.convert("RGB")
-            
-            # Nén ảnh: Giảm kích thước và chất lượng (quality=70)
             out = io.BytesIO()
             img.save(out, format="JPEG", quality=70, optimize=True)
             b6 = base64.b64encode(out.getvalue()).decode('utf-8')
-            
             r = requests.post("https://api.imgbb.com/1/upload", {"key": ak, "image": b6}, timeout=20)
             if r.status_code == 200: res.append(r.json()['data']['url'])
         return ",".join(res)
-    except Exception as e:
-        print(f"Lỗi upload: {e}")
-        return ""
+    except: return ""
 
 def change_img(step, total):
     st.session_state.ci = (st.session_state.get('ci', 0) + step) % total
@@ -107,7 +101,7 @@ def show_dt(row, ks):
                 with cn:
                     if st.button("Hủy", use_container_width=True, key=f"no_{mid}"):
                         st.session_state[ck] = False; st.rerun()
-        st.code(f"Mã Căn: {mid if is_adm else 'Ẩn'}")
+        st.code(f"Mã: {mid if is_adm else 'Ẩn'}")
 
 # --- GIAO DIỆN CHÍNH ---
 head_c1, head_c2 = st.columns([6, 4], vertical_alignment="center")
@@ -144,8 +138,8 @@ if sh_obj is not None and not df_raw.empty:
         with c1: pk = st.multiselect("Phân khu", LIST_PK, placeholder="Lựa chọn", key=f"p{ks}")
         with c2: lh = st.multiselect("Loại hình", LIST_LH, placeholder="Lựa chọn", key=f"l{ks}")
         with c3:
-            mi, ma = float(df_in[L_GIA].min()), float(df_in[L_GIA].max())
-            r_gia = st.slider("Giá (Tỷ)", mi, ma, (mi, ma), key=f"g{ks}")
+            # CẬP NHẬT: Dải trượt từ 0.0 đến 10.0 Tỷ
+            r_gia = st.slider("Giá (Tỷ)", 0.0, 10.0, (0.0, 10.0), step=0.1, key=f"g{ks}")
         
         if pk: df_a = df_a[df_a[L_PK].isin(pk)]
         if lh: df_a = df_a[df_a[L_LH].isin(lh)]
@@ -194,7 +188,6 @@ if sh_obj is not None and not df_raw.empty:
                                 if col in dm: row_d[i] = dm[col]
                             sh_obj.append_row(row_d)
                             st.cache_resource.clear(); st.success("Đăng thành công!"); time.sleep(1); st.rerun()
-                        except Exception as e:
-                            st.error(f"Lỗi Sheets: {e}")
+                        except: st.error("Lỗi Sheets")
         else:
             st.warning("### 🔐 Khu vực dành cho quản trị viên")
