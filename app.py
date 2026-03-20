@@ -94,17 +94,17 @@ def show_dt(row, ks):
         st.code(f"Mã: {mid if is_adm else 'Ẩn'}")
 
 # --- GIAO DIỆN CHÍNH ---
-h1, h2 = st.columns([6, 4])
+h1, h2 = st.columns([7, 3]) # Chỉnh tỷ lệ để tiêu đề dài ra, thanh đăng nhập nhỏ lại
 with h1: 
     st.markdown("### 🏢 Nguồn hàng Vinhomes Smart City - Mr. Ninh - 0912.791.925")
 
 with h2:
     if not is_adm:
-        c_in, c_bt = st.columns([3, 1])
+        c_in, c_bt = st.columns([2, 1]) # Làm thanh nhập pass nhỏ hơn nữa
         with c_in:
-            p = st.text_input("", type="password", placeholder="Nhập mật khẩu Admin...", label_visibility="collapsed", key="login_pass")
+            p = st.text_input("", type="password", placeholder="Password...", label_visibility="collapsed", key="login_pass")
         with c_bt:
-            if st.button("🔓 Login", use_container_width=True):
+            if st.button("Đăng nhập", use_container_width=True):
                 if p == "admin123":
                     st.session_state.is_login = True; st.rerun()
                 else:
@@ -112,10 +112,10 @@ with h2:
     else:
         ca1, ca2 = st.columns(2)
         with ca1:
-            if st.button("🔄 Làm mới dữ liệu", key="btn_ref", use_container_width=True): 
+            if st.button("🔄 Làm mới", key="btn_ref", use_container_width=True): 
                 st.cache_resource.clear(); st.rerun()
         with ca2:
-            if st.button("🔒 Đăng xuất", key="btn_out", use_container_width=True, type="primary"): 
+            if st.button("🔒 Thoát", key="btn_out", use_container_width=True, type="primary"): 
                 st.session_state.is_login = False; st.rerun()
 
 if sh_obj is not None and not df_raw.empty:
@@ -170,15 +170,12 @@ if sh_obj is not None and not df_raw.empty:
                             sh_obj.append_row(row_d); st.cache_resource.clear(); st.rerun()
                         except: st.error("Lỗi Sheets")
         else:
-            # GIAO DIỆN DÀNH RIÊNG CHO CỘNG TÁC VIÊN KHI BẤM THÊM HÀNG
+            # Thông báo Tab Thêm hàng dành cho CTV (Đã bỏ nút quay lại)
             st.warning("### 🔐 Khu vực dành cho quản trị viên")
             st.info("""
-            Chào bạn, để đảm bảo tính xác thực của nguồn hàng, chức năng **Thêm hàng** chỉ dành cho tài khoản Admin.
+            Chào bạn, chức năng **Thêm hàng** chỉ dành cho tài khoản Admin.
             
-            **Để cộng tác đăng căn, vui lòng:**
-            1. Liên hệ trực tiếp qua Hotline: **0912.791.925 (Mr. Ninh)**
-            2. Nhập mật khẩu Admin ở góc trên bên phải nếu bạn đã có tài khoản.
-            
-            *Trân trọng cảm ơn!*
+            **Để cộng tác hoặc ký gửi nguồn hàng, vui lòng:**
+            * Liên hệ trực tiếp: **0912.791.925 (Mr. Ninh)**
+            * Nhập mật khẩu Admin ở thanh đăng nhập phía trên.
             """)
-            st.button("Quay lại danh sách căn hộ", on_click=lambda: None) # Nút bấm giúp CTV quay về tab 1/2
