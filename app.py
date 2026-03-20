@@ -113,11 +113,14 @@ if sh_obj is not None and not df_raw.empty:
         if lh: df_a = df_a[df_a[L_LH].isin(lh)]
         df_a = df_a[(df_a[L_GIA] >= r_gia[0]) & (df_a[L_GIA] <= r_gia[1])]
         
+        # --- DÒNG ĐẾM THEO MÀU ICON ---
+        color = "#FF4B4B" if ks == "B" else "#28A745"
+        st.markdown(f"<p style='color:{color}; font-weight:bold; font-size:18px; margin-bottom: -10px;'>🔍 Đang hiển thị: {len(df_a)} căn hộ phù hợp</p>", unsafe_allow_html=True)
+        
         v_cols = [L_DATE, L_LH, L_PK, L_DT, L_GIA, L_TT]
         if is_adm: v_cols.append(L_MA)
         sel = st.dataframe(df_a[v_cols], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row", key=f"df{ks}")
         if sel and sel.selection.rows:
-            # Reset index ảnh về 0 khi chọn căn mới
             row_sel = df_a.iloc[sel.selection.rows[0]]
             if st.session_state.get('last_ma') != row_sel[L_MA]:
                 st.session_state.ci = 0
