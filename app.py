@@ -6,16 +6,17 @@ import requests, base64
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
-L_TYPE, L1, L2, L3 = "Phân loại", "Phân khu", "Loại hình", "Mã căn"
-L4, L5, L6, L7, L8, L9 = "Diện tích", "Khoảng tầng", "Nội thất", "Hướng BC", "Giá bán", "Link ảnh"
-L10, L11, L12 = "Hiện trạng", "Ghi chú", "Trạng thái"
+# Khai báo nhãn (Tránh dùng Emoji trong code logic)
+L_TYPE, L1, L2, L3 = "Phan loai", "Phan khu", "Loai hinh", "Ma can"
+L4, L5, L6, L7, L8, L9 = "Dien tich", "Tang", "Noi that", "Huong", "Gia", "Anh"
+L10, L11, L12 = "Hien trang", "Ghi chu", "Trang thai"
 
 PK_L = ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"]
 LH_L = ["Studio", "1PN+", "2PN", "2PN+", "3N"]
-H_L = ["Đông", "Tây", "Nam", "Bắc", "ĐB", "ĐN", "TB", "TN"]
-NT_L = ["Nguyên bản", "Cơ bản", "Full đồ"]
-TG_L = ["Thấp", "Trung", "Cao"]
-HT_L = ["Đang ở", "Đang cho thuê", "Để trống"]
+H_L = ["Dong", "Tay", "Nam", "Bac", "DB", "DN", "TB", "TN"]
+NT_L = ["Nguyen ban", "Co ban", "Full do"]
+TG_L = ["Thap", "Trung", "Cao"]
+HT_L = ["Dang o", "Cho thue", "Trong"]
 
 def up_img(fs):
     if not fs: return ""
@@ -46,46 +47,58 @@ df_raw, sh_obj = load_data()
 if 'is_login' not in st.session_state: st.session_state.is_login = False
 
 h1, h2 = st.columns([7, 3])
-with h1: st.title("🏢 Vinhomes Manager")
+with h1: st.title("Vinhomes Manager")
 with h2:
-    s1, s2 = st.columns([5, 1])
-    with s1:
-        if not st.session_state.is_login:
-            p = st.text_input("P", type="password", label_visibility="collapsed")
-            if p == "admin123": st.session_state.is_login = True; st.rerun()
-        else: st.write("Admin ✅")
-    with s2:
-        if st.button("🔄"): st.cache_resource.clear(); st.rerun()
+    if not st.session_state.is_login:
+        p = st.text_input("P", type="password", label_visibility="collapsed")
+        if p == "admin123": st.session_state.is_login = True; st.rerun()
+    else:
+        if st.button("Refresh / Logout"): st.cache_resource.clear(); st.rerun()
 
 is_adm = st.session_state.is_login
 
 if sh_obj is not None:
-    t1, t2, t3 = st.tabs(["🔴 Bán", "🟢 Thuê", "➕ Thêm"])
+    t1, t2, t3 = st.tabs(["Ban", "Thue", "Them hang"])
     def draw(df_in, ks):
-        df_a = df_in[~df_in[L12].astype(str).str.contains("Đã", na=False)]
+        df_a = df_in[~df_in[L12].astype(str).str.contains("Da", na=False)]
         if df_a.empty: 
-            st.info("Trống"); return
+            st.info("Trong"); return
         ca, cb = st.columns(2)
-        with ca: pk = st.multiselect(f"Phân khu", PK_L, key=f"p{ks}")
-        with cb: lh = st.multiselect(f"Loại hình", LH_L, key=f"l{ks}")
+        with ca: pk = st.multiselect(f"Khu {ks}", PK_L, key=f"p{ks}")
+        with cb: lh = st.multiselect(f"Loai {ks}", LH_L, key=f"l{ks}")
         if pk: df_a = df_a[df_a[L1].isin(pk)]
         if lh: df_a = df_a[df_a[L2].isin(lh)]
         scols = df_a.drop(columns=[L9, L_TYPE, L12, L3] if not is_adm else [L9, L_TYPE, L12], errors='ignore')
-        st.write(f"Tìm thấy {len(df_a)} căn")
+        st.write(f"Tim thay {len(df_a)} can")
         sel = st.dataframe(scols, use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row", key=f"d{ks}")
 
-        @st.dialog(f"Chi tiết {ks}")
+        @st.dialog(f"Detail {ks}")
         def show_dt(row):
             c1, c2 = st.columns([1.2, 1])
             with c1:
                 ls = str(row.get(L9, "")).split(',') if row.get(L9) else []
                 if ls and ls[0]:
                     if 'ci' not in st.session_state: st.session_state.ci = 0
-                    ix = st.session_state.ci % len(ls)
-                    st.image(ls[ix], use_container_width=True)
+                    ix = st.session_state.ci % len(ls); st.image(ls[ix], use_container_width=True)
                     if len(ls) > 1:
                         b1, b2 = st.columns(2)
                         with b1: 
-                            if st.button("⬅️", key=f"prev{ks}"): st.session_state.ci -= 1; st.rerun()
+                            if st.button("<<", key=f"pre{ks}"): st.session_state.ci -= 1; st.rerun()
                         with b2:
-                            if st.button("
+                            if st.button(">>", key=f"nex{ks}"): st.session_state.ci += 1; st.rerun()
+                else: st.info("No Image")
+            with c2:
+                st.subheader(f"{row[L2]} - {row[L1]}"); st.write(f"Gia: {row[L8]}")
+                if is_adm:
+                    st.divider(); ck = f"cf_{row[L3]}"
+                    if ck not in st.session_state: st.session_state[ck] = False
+                    if not st.session_state[ck]:
+                        if st.button("CHOT CAN NAY", use_container_width=True, type="primary", key=f"bc{ks}"):
+                            st.session_state[ck] = True; st.rerun()
+                    else:
+                        st.warning("Xac nhan chot?"); cy, cn = st.columns(2)
+                        with cy:
+                            if st.button("OK", use_container_width=True, key=f"y{ks}"):
+                                try:
+                                    h = [x.strip() for x in sh_obj.row_values(1)]; ids = sh_obj.col_values(h.index(L3)+1); ridx = ids.index(row[L3])+1
+                                    val = "Da ban" if row[L_TYPE]=="Bán" or row[L_TYPE]=="Ban" else "Da
