@@ -77,11 +77,8 @@ if sh_obj is not None and not df_raw.empty:
         if df_a.empty: st.info("Trống."); return
         
         st.markdown("### 🔍 Tìm & Lọc")
-        
-        # CHỈ HIỆN TÌM MÃ CĂN NẾU LÀ ADMIN
         s_ma = ""
-        if is_adm:
-            s_ma = st.text_input("Tìm Mã căn (Chỉ Admin)...", key=f"s{ks}").strip()
+        if is_adm: s_ma = st.text_input("Tìm Mã căn (Admin)...", key=f"s{ks}").strip()
         
         c1, c2, c3 = st.columns([3, 3, 4])
         with c1: pk = st.multiselect("Phân khu", sorted(df_in[L_PK].unique()), key=f"p{ks}")
@@ -115,59 +112,4 @@ if sh_obj is not None and not df_raw.empty:
                         with b1:
                             if st.button("⬅️", key=f"p_{mid}_{ks}"): st.session_state.ci -= 1; st.rerun()
                         with b2:
-                            if st.button("➡️", key=f"n_{mid}_{ks}"): st.session_state.ci += 1; st.rerun()
-                else: st.info("Không ảnh")
-            with cl2:
-                st.subheader(f"{row[L_LH]} - {row[L_PK]}")
-                st.success(f"Giá: {row[L_GIA]} Tỷ")
-                
-                # KHÔI PHỤC CHỨC NĂNG CHỐT CĂN CHO ADMIN
-                if is_adm:
-                    st.divider(); ck = f"ck_{mid}"
-                    if ck not in st.session_state: st.session_state[ck] = False
-                    if not st.session_state[ck]:
-                        if st.button("✅ CHỐT CĂN NÀY", use_container_width=True, type="primary", key=f"bt_{mid}"): 
-                            st.session_state[ck] = True; st.rerun()
-                    else:
-                        st.warning("Xác nhận đã bán/thuê?"); cy, cn = st.columns(2)
-                        with cy:
-                            if st.button("OK", type="primary", use_container_width=True, key=f"ok_{mid}"):
-                                try:
-                                    h = [x.strip() for x in sh_obj.row_values(1)]; idx = h.index(L_TT) + 1
-                                    sh_obj.update_cell(int(row['sheet_row']), idx, V_SOLD if ks=="B" else V_RENT)
-                                    st.session_state[ck] = False; st.cache_resource.clear(); st.rerun()
-                                except: st.error("Lỗi cập nhật")
-                        with cn:
-                            if st.button("Hủy", use_container_width=True, key=f"no_{mid}"): st.session_state[ck]=False; st.rerun()
-                
-                st.code(f"Mã: {mid if is_adm else 'Ẩn'}\nGhi chú: {row.get(L_GC, '')}")
-        
-        if sel and sel.selection.rows: st.session_state.ci = 0; show_dt(df_a.iloc[sel.selection.rows[0]])
-
-    with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Bán|Ban|bán|ban", na=False)], "B")
-    with t2: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Thuê|Thue|thuê|thue", na=False)], "T")
-    with t3:
-        if is_adm:
-            with st.form("f_add", clear_on_submit=True):
-                tp = st.radio("Loại", ["Bán", "Cho thuê"], horizontal=True)
-                i1, i2, i3 = st.columns(3)
-                with i1:
-                    v_lh = st.selectbox(L_LH, ["Studio", "1PN+", "2PN", "2PN+", "3N"])
-                    v_ma = st.text_input(L_MA)
-                with i2:
-                    v_pk = st.selectbox(L_PK, ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
-                    v_dt = st.number_input(L_DT, 0.0)
-                with i3:
-                    v_gi = st.number_input(L_GIA, step=0.1)
-                    v_ht = st.selectbox(L_HT, ["Đang ở", "Để trống", "Cho thuê"])
-                v_gc = st.text_input(L_GC); up = st.file_uploader("Ảnh", accept_multiple_files=True)
-                if st.form_submit_button("🚀 ĐĂNG CĂN"):
-                    if v_ma:
-                        imgs = up_img(up)
-                        try:
-                            h = [x.strip() for x in sh_obj.row_values(1)]; row_d = [""] * len(h)
-                            dm = {L_TYPE:tp, L_DATE:str(pd.Timestamp.now().date()), L_LH:v_lh, L_PK:v_pk, L_MA:v_ma, L_DT:v_dt, L_GIA:v_gi, L_HT:v_ht, L_GC:v_gc, L_TT:"Đang bán", L_IMG:imgs}
-                            for i, col in enumerate(h):
-                                if col in dm: row_d[i] = dm[col]
-                            sh_obj.append_row(row_d); st.cache_resource.clear(); st.rerun()
-                        except: st.error("Lỗi")
+                            if st.button("➡️", key=f"n_{mid}_{ks}"): st.session_state.
