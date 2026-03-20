@@ -9,6 +9,10 @@ st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 # --- DANH SÁCH CỐ ĐỊNH ---
 LIST_PK = ["S", "GS", "SA", "VIC", "Sola", "Imper", "Tonkin", "Canopy", "Masteri", "Lumier"]
 LIST_LH = ["Studio", "1N", "1N+", "2N", "2N+", "3N"]
+# Thêm danh sách lựa chọn cho các trường mới
+LIST_TANG = ["Thấp", "Trung", "Cao"]
+LIST_NT = ["Nguyên bản", "Cơ bản", "Đầy đủ nội thất"]
+LIST_HBC = ["Đông", "Tây", "Nam", "Bắc", "Đông Nam", "Đông Bắc", "Tây Nam", "Tây Bắc"]
 
 # --- NHÃN CỘT ---
 L_DATE, L_LH, L_PK, L_MA = "Ngày lên hàng", "Loại hình", "Phân khu", "Mã căn"
@@ -93,7 +97,7 @@ def show_dt(row, ks):
                         st.session_state[ck] = False; st.rerun()
         st.code(f"Mã: {mid if is_adm else 'Ẩn'}")
 
-# --- GIAO DIỆN CHÍNH (HEADER INLINE) ---
+# --- GIAO DIỆN CHÍNH ---
 head_c1, head_c2 = st.columns([6, 4], vertical_alignment="center")
 with head_c1:
     st.markdown("<h4 style='margin:0; padding:0;'>🏢 Nguồn hàng Vinhomes Smart City - Mr. Ninh - 0912.791.925</h4>", unsafe_allow_html=True)
@@ -134,17 +138,14 @@ if sh_obj is not None and not df_raw.empty:
         if pk: df_a = df_a[df_a[L_PK].isin(pk)]
         if lh: df_a = df_a[df_a[L_LH].isin(lh)]
         df_a = df_a[(df_a[L_GIA] >= r_gia[0]) & (df_a[L_GIA] <= r_gia[1])]
-        
         st.markdown(f"<div style='padding: 15px 0px; font-weight: bold; font-size: 17px;'>🔍 Đang hiển thị: {len(df_a)} căn hộ phù hợp</div>", unsafe_allow_html=True)
         
         v_cols = [L_DATE, L_LH, L_PK, L_DT, L_GIA, L_TT]
         if is_adm: v_cols.append(L_MA)
         sel = st.dataframe(df_a[v_cols], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row", key=f"df{ks}")
-        
-        # SỬA LỖI TẠI ĐÂY: Kiểm tra dòng được chọn có hợp lệ với dữ liệu hiện tại không
         if sel and sel.selection.rows:
             idx = sel.selection.rows[0]
-            if idx < len(df_a): # Đảm bảo index không vượt quá độ dài danh sách hiện tại
+            if idx < len(df_a):
                 st.session_state.ci = 0; show_dt(df_a.iloc[idx], ks)
 
     with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Bán|Ban", na=False)], "B")
@@ -157,11 +158,14 @@ if sh_obj is not None and not df_raw.empty:
                 with i1:
                     v_lh = st.selectbox(L_LH, LIST_LH, placeholder="Lựa chọn")
                     v_ma = st.text_input(L_MA)
+                    v_tang = st.selectbox(L_TANG, LIST_TANG, placeholder="Lựa chọn") # MỚI
                 with i2:
                     v_pk = st.selectbox(L_PK, LIST_PK, placeholder="Lựa chọn")
                     v_dt = st.number_input(L_DT, 0.0)
+                    v_nt = st.selectbox(L_NT, LIST_NT, placeholder="Lựa chọn") # MỚI
                 with i3:
                     v_gi = st.number_input(L_GIA, step=0.1)
+                    v_hbc = st.selectbox(L_HBC, LIST_HBC, placeholder="Lựa chọn") # MỚI
                     v_ht = st.selectbox(L_HT, ["Đang ở", "Để trống", "Cho thuê"])
                 v_gc = st.text_input(L_GC); up = st.file_uploader("Ảnh", accept_multiple_files=True)
                 if st.form_submit_button("🚀 ĐĂNG CĂN"):
@@ -169,15 +173,15 @@ if sh_obj is not None and not df_raw.empty:
                         imgs = up_img(up)
                         try:
                             h = list(df_raw.columns); row_d = [""] * len(h)
-                            dm = {L_TYPE:tp, L_DATE:str(pd.Timestamp.now().date()), L_LH:v_lh, L_PK:v_pk, L_MA:v_ma, L_DT:v_dt, L_GIA:v_gi, L_HT:v_ht, L_GC:v_gc, L_TT:"Đang bán", L_IMG:imgs}
+                            # Cập nhật thêm các trường mới vào Dictionary
+                            dm = {L_TYPE:tp, L_DATE:str(pd.Timestamp.now().date()), L_LH:v_lh, 
+                                  L_PK:v_pk, L_MA:v_ma, L_DT:v_dt, L_GIA:v_gi, L_HT:v_ht, 
+                                  L_GC:v_gc, L_TT:"Đang bán", L_IMG:imgs,
+                                  L_TANG:v_tang, L_NT:v_nt, L_HBC:v_hbc} # GỬI DỮ LIỆU MỚI
                             for i, col in enumerate(h):
                                 if col in dm: row_d[i] = dm[col]
                             sh_obj.append_row(row_d); st.cache_resource.clear(); st.rerun()
                         except: st.error("Lỗi Sheets")
         else:
             st.warning("### 🔐 Khu vực dành cho quản trị viên")
-            st.info("""
-            Chào bạn, chức năng **Thêm hàng** chỉ dành cho tài khoản Admin.
-            **Để cộng tác hoặc ký gửi nguồn hàng, vui lòng:**
-            * Liên hệ trực tiếp: **0912.791.925 (Mr. Ninh)**
-            """)
+            st.info("Chào bạn, chức năng Thêm hàng chỉ dành cho tài khoản Admin.")
