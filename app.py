@@ -3,7 +3,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 
-# 1. KẾT NỐI DỮ LIỆU
+# 1. CẤU HÌNH & KẾT NỐI
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
 @st.cache_resource
@@ -17,17 +17,18 @@ def load_data():
         sh = ss.get_worksheet(0)
         raw = sh.get_all_values()
         if not raw or len(raw) < 1: return pd.DataFrame(), sh
-        df = pd.DataFrame(raw[1:], columns=[str(h).strip() for h in raw[0]])
+        cols = [str(h).strip() for h in raw[0]]
+        df = pd.DataFrame(raw[1:], columns=cols)
         if "Giá bán" in df.columns:
             df["Giá bán"] = pd.to_numeric(df["Giá bán"], errors='coerce').fillna(0)
         return df.iloc[::-1].reset_index(drop=True), sh
     except Exception as e:
-        st.error(f"Lỗi kết nối: {e}")
+        st.error(f"Lỗi: {e}")
         return pd.DataFrame(), None
 
 df_raw, sheet_obj = load_data()
 
-# 2. SIDEBAR
+# 2. THANH BÊN
 with st.sidebar:
     st.header("🔑 Phân quyền")
     pw = st.text_input("Mật khẩu Admin", type="password")
@@ -41,10 +42,15 @@ with st.sidebar:
 st.title("🏢 Kho Hàng Vinhomes Smart City")
 
 if sheet_obj is not None:
-    t1, t2 = st.tabs(["📋 Danh sách căn hộ", "➕ Thêm hàng mới"])
+    t1, t2 = st.tabs(["📋 Danh sách", "➕ Thêm hàng"])
 
     with t1:
         c1, c2, c3 = st.columns(3)
-        with c1: pk_f = st.multiselect("Phân khu", ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
-        with c2: lh_f = st.multiselect("Loại hình", ["Studio", "1PN+", "2PN", "2PN+", "3N"])
-        with c3: pr_f = st.slider("Giá (Tỷ)", 0.0, 10.0, (0.0, 10.
+        with c1: 
+            pk_list = ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"]
+            pk_f = st.multiselect("Phân khu", pk_list)
+        with c2: 
+            lh_list = ["Studio", "1PN+", "2PN", "2PN+", "3N"]
+            lh_f = st.multiselect("Loại hình", lh_list)
+        with c3: 
+            # Chia nhỏ dòng slider để tránh bị
