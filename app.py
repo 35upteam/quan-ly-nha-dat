@@ -6,14 +6,18 @@ import requests, base64, time, urllib.parse
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide", page_icon="🏢")
 
-# --- CẤU HÌNH NHÃN ---
+# --- BIẾN ĐIỀU HƯỚNG ---
+K_BAN = "Bán|Ban|bán|ban"
+K_THUE = "Thuê|Thue|thuê|thue"
+MY_ZALO = "0900000000" # <-- THAY SỐ ĐIỆN THOẠI CỦA BẠN VÀO ĐÂY
+
+# --- NHÃN CỘT ---
 L_DATE, L_LH, L_PK, L_MA = "Ngày lên hàng", "Loại hình", "Phân khu", "Mã căn"
 L_DT, L_TANG, L_NT, L_HBC = "Diện tích", "Khoảng tầng", "Nội thất", "Hướng BC"
 L_GIA, L_HT, L_TT, L_IMG = "Giá bán", "Hiện trạng", "Trạng thái", "Link ảnh"
 L_TYPE, L_GC = "Phân loại", "Ghi chú"
 V_SOLD, V_RENT = "Đã bán", "Đã thuê"
 
-# --- HÀM TRỢ GIÚP ---
 @st.cache_resource
 def load_data():
     try:
@@ -31,50 +35,38 @@ def load_data():
 
 df_raw, sh_obj = load_data()
 
-# --- XỬ LÝ CHẾ ĐỘ VIEW DÀNH CHO KHÁCH (Dựa trên URL) ---
-# Lấy tham số 'id' từ URL (ví dụ: ?id=S1021505)
-query_params = st.query_params
-guest_view_id = query_params.get("id")
+# --- XỬ LÝ CHẾ ĐỘ VIEW CHO KHÁCH ---
+q = st.query_params
+gid = q.get("id")
 
-def show_guest_view(row):
-    st.write("### 🏠 Thông tin chi tiết căn hộ")
-    c1, c2 = st.columns([1.5, 1])
-    with c1:
-        imgs = str(row.get(L_IMG, "")).split(',') if row.get(L_IMG) else []
-        if imgs and imgs[0]:
-            if 'g_ci' not in st.session_state: st.session_state.g_ci = 0
-            ix = st.session_state.g_ci % len(imgs)
-            st.image(imgs[ix], use_container_width=True)
-            if len(imgs) > 1:
-                b1, b2 = st.columns(2)
-                with b1:
-                    if st.button("⬅️ Trước"): st.session_state.g_ci -= 1; st.rerun()
-                with b2:
-                    if st.button("Sau ➡️"): st.session_state.g_ci += 1; st.rerun()
-        else: st.info("Hình ảnh đang được cập nhật...")
-    with c2:
-        st.subheader(f"{row[L_LH]} - {row[L_PK]}")
-        st.header(f"💰 {row[L_GIA]} Tỷ")
-        st.divider()
-        st.write(f"📐 **Diện tích:** {row[L_DT]}m²")
-        st.write(f"🧭 **Hướng BC:** {row[L_HBC]}")
-        st.write(f"🧱 **Khoảng tầng:** {row[L_TANG]}")
-        st.write(f"🛋️ **Nội thất:** {row[L_NT]}")
-        st.write(f"🚧 **Hiện trạng:** {row[L_HT]}")
-        if row.get(L_GC): st.info(f"**Lưu ý:** {row[L_GC]}")
-        st.success("Liên hệ trực tiếp để nhận ưu đãi và xem nhà!")
-
-# Nếu có ID khách xem, hiện giao diện khách và dừng App tại đây
-if guest_view_id and not df_raw.empty:
-    target_row = df_raw[df_raw[L_MA] == guest_view_id]
-    if not target_row.empty:
-        show_guest_view(target_row.iloc[0])
-        st.stop() # Dừng không chạy phần quản lý bên dưới
-    else:
-        st.error("Căn hộ này đã được bán hoặc không tồn tại.")
+if gid and not df_raw.empty:
+    r = df_raw[df_raw[L_MA] == gid]
+    if not r.empty:
+        row = r.iloc[0]
+        st.write(f"### 🏠 Căn hộ {row[L_PK]}")
+        c1, c2 = st.columns([1.5, 1])
+        with c1:
+            imgs = str(row.get(L_IMG, "")).split(',') if row.get(L_IMG) else []
+            if imgs and imgs[0]:
+                if 'gci' not in st.session_state: st.session_state.gci = 0
+                ix = st.session_state.gci % len(imgs); st.image(imgs[ix], use_container_width=True)
+                if len(imgs) > 1:
+                    b1, b2 = st.columns(2)
+                    with b1:
+                        if st.button("⬅️"): st.session_state.gci -= 1; st.rerun()
+                    with b2:
+                        if st.button("Sau ➡️"): st.session_state.gci += 1; st.rerun()
+        with c2:
+            st.header(f"💰 {row[L_GIA]} Tỷ")
+            st.write(f"📍 **{row[L_LH]} - {row[L_PK]}**")
+            st.divider()
+            st.write(f"📐 Diện tích: {row[L_DT]}m² | 🧭 Hướng: {row[L_HBC]}")
+            st.write(f"🛋️ Nội thất: {row[L_NT]} | 🧱 Tầng: {row[L_TANG]}")
+            if row.get(L_GC): st.info(f"Ghi chú: {row[L_GC]}")
+            st.link_button("💬 LIÊN HỆ QUA ZALO NGAY", f"https://zalo.me/{MY_ZALO}", type="primary", use_container_width=True)
         st.stop()
 
-# --- GIAO DIỆN QUẢN LÝ (CHO ADMIN & CTV) ---
+# --- GIAO DIỆN QUẢN LÝ ---
 if 'is_login' not in st.session_state: st.session_state.is_login = False
 is_adm = st.session_state.is_login
 
@@ -97,12 +89,10 @@ def show_dt(row, ks):
         st.subheader(f"{row[L_LH]} - {row[L_PK]}")
         st.success(f"{row[L_GIA]} Tỷ")
         
-        # --- NÚT LẤY LINK GỬI KHÁCH ---
-        base_url = "https://quan-ly-nha-dat.streamlit.app/" # Thay bằng link app thật của bạn
-        share_url = f"{base_url}?id={mid}"
-        st.text_input("Link gửi khách (Đã ẩn mã căn):", value=share_url)
-        st.caption("Hãy copy link này gửi cho khách qua Zalo/Facebook")
-
+        # Link gửi khách (Lấy URL hiện tại tự động)
+        share_url = f"https://quan-ly-nha-dat.streamlit.app/?id={mid}"
+        st.text_input("Link gửi khách:", value=share_url)
+        
         if is_adm:
             st.divider(); ck = f"ck_{mid}"
             if not st.session_state.get(ck, False):
@@ -117,21 +107,18 @@ def show_dt(row, ks):
                         st.session_state[ck] = False; st.cache_resource.clear(); st.rerun()
                 with cn:
                     if st.button("Hủy", key=f"no_{mid}"): st.session_state[ck] = False; st.rerun()
-        st.code(f"Mã nội bộ: {mid if is_adm else 'Ẩn'}")
+        st.code(f"Mã: {mid if is_adm else 'Ẩn'}")
 
-# --- PHẦN CÒN LẠI GIỮ NGUYÊN NHƯ BẢN CŨ ---
-h1, h2 = st.columns([7, 3])
-with h1: st.title("🏢 Vinhomes Manager")
-with h2:
-    if not is_adm:
-        p = st.text_input("Admin", type="password", label_visibility="collapsed")
-        if p == "admin123": st.session_state.is_login = True; st.rerun()
-    else:
-        st.info("✅ Admin")
-        if st.button("Thoát"): st.session_state.is_login = False; st.rerun()
+# --- PHẦN CHÍNH ---
+st.title("🏢 Vinhomes Manager")
+if not is_adm:
+    p = st.text_input("Admin", type="password")
+    if p == "admin123": st.session_state.is_login = True; st.rerun()
+else:
+    if st.button("Thoát Admin"): st.session_state.is_login = False; st.rerun()
 
-if sh_obj is not None and not df_raw.empty:
-    t1, t2, t3 = st.tabs(["🔴 Bán", "🟢 Thuê", "➕ Thêm hàng"])
+if not df_raw.empty:
+    t1, t2 = st.tabs(["🔴 Bán", "🟢 Thuê"])
     def draw(df_in, ks):
         df_a = df_in[~df_in[L_TT].astype(str).str.contains("Đã", na=False)]
         c1, c2, c3 = st.columns([3, 3, 4])
@@ -140,6 +127,7 @@ if sh_obj is not None and not df_raw.empty:
         with c3:
             mi, ma = float(df_in[L_GIA].min()), float(df_in[L_GIA].max())
             r_gia = st.slider("Giá (Tỷ)", mi, ma, (mi, ma), key=f"g{ks}")
+        
         if pk: df_a = df_a[df_a[L_PK].isin(pk)]
         if lh: df_a = df_a[df_a[L_LH].isin(lh)]
         df_a = df_a[(df_a[L_GIA] >= r_gia[0]) & (df_a[L_GIA] <= r_gia[1])]
@@ -150,4 +138,5 @@ if sh_obj is not None and not df_raw.empty:
         if sel and sel.selection.rows:
             st.session_state.ci = 0; show_dt(df_a.iloc[sel.selection.rows[0]], ks)
 
-    with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Bán|Ban
+    with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains(K_BAN, na=False)], "B")
+    with t2: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains(K_THUE, na=False)], "T")
