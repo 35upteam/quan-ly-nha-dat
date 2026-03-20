@@ -94,15 +94,11 @@ def show_dt(row, ks):
         st.code(f"Mã: {mid if is_adm else 'Ẩn'}")
 
 # --- GIAO DIỆN CHÍNH (HEADER INLINE) ---
-# Chia làm 2 cột lớn: Cột 1 chứa tiêu đề, Cột 2 chứa cụm đăng nhập
 head_c1, head_c2 = st.columns([6, 4], vertical_alignment="center")
-
 with head_c1:
     st.markdown("<h4 style='margin:0; padding:0;'>🏢 Nguồn hàng Vinhomes Smart City - Mr. Ninh - 0912.791.925</h4>", unsafe_allow_html=True)
-
 with head_c2:
     if not is_adm:
-        # Chia nhỏ cột 2 để pass và nút nằm ngang
         c_in, c_bt = st.columns([2.5, 1.5], vertical_alignment="center")
         with c_in:
             p = st.text_input("", type="password", placeholder="Password...", label_visibility="collapsed", key="login_pass")
@@ -120,8 +116,7 @@ with head_c2:
         with ca2:
             if st.button("🔒 Thoát", key="btn_out", use_container_width=True, type="primary"): 
                 st.session_state.is_login = False; st.rerun()
-
-st.divider() # Ngăn cách header với nội dung bên dưới
+st.divider()
 
 if sh_obj is not None and not df_raw.empty:
     t1, t2, t3 = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
@@ -129,8 +124,9 @@ if sh_obj is not None and not df_raw.empty:
     def draw(df_in, ks):
         df_a = df_in[~df_in[L_TT].astype(str).str.contains("Đã", na=False)]
         c1, c2, c3 = st.columns([3, 3, 4])
-        with c1: pk = st.multiselect("Phân khu", LIST_PK, key=f"p{ks}")
-        with c2: lh = st.multiselect("Loại hình", LIST_LH, key=f"l{ks}")
+        # ĐÃ CẬP NHẬT placeholder="Lựa chọn" CHO BỘ LỌC
+        with c1: pk = st.multiselect("Phân khu", LIST_PK, placeholder="Lựa chọn", key=f"p{ks}")
+        with c2: lh = st.multiselect("Loại hình", LIST_LH, placeholder="Lựa chọn", key=f"l{ks}")
         with c3:
             mi, ma = float(df_in[L_GIA].min()), float(df_in[L_GIA].max())
             r_gia = st.slider("Giá (Tỷ)", mi, ma, (mi, ma), key=f"g{ks}")
@@ -155,10 +151,10 @@ if sh_obj is not None and not df_raw.empty:
                 tp = st.radio("Loại", ["Bán", "Cho thuê"], horizontal=True)
                 i1, i2, i3 = st.columns(3)
                 with i1:
-                    v_lh = st.selectbox(L_LH, LIST_LH)
+                    v_lh = st.selectbox(L_LH, LIST_LH, placeholder="Lựa chọn")
                     v_ma = st.text_input(L_MA)
                 with i2:
-                    v_pk = st.selectbox(L_PK, LIST_PK)
+                    v_pk = st.selectbox(L_PK, LIST_PK, placeholder="Lựa chọn")
                     v_dt = st.number_input(L_DT, 0.0)
                 with i3:
                     v_gi = st.number_input(L_GIA, step=0.1)
