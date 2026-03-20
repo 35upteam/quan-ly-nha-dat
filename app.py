@@ -6,7 +6,7 @@ import requests, base64, time
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
-# --- DANH SÁCH CỐ ĐỊNH (THEO YÊU CẦU) ---
+# --- DANH SÁCH CỐ ĐỊNH ---
 LIST_PK = ["S", "GS", "SA", "VIC", "Sola", "Imper", "Tonkin", "Canopy", "Masteri", "Lumier"]
 LIST_LH = ["Studio", "1N", "1N+", "2N", "2N+", "3N"]
 
@@ -94,19 +94,29 @@ def show_dt(row, ks):
         st.code(f"Mã: {mid if is_adm else 'Ẩn'}")
 
 # --- GIAO DIỆN CHÍNH ---
-h1, h2 = st.columns([7, 3])
-with h1: st.title("🏢 Vinhomes Manager")
+h1, h2 = st.columns([6, 4])
+with h1: 
+    st.markdown("### 🏢 Nguồn hàng Vinhomes Smart City - Mr. Ninh - 0912.791.925")
+
 with h2:
     if not is_adm:
-        p = st.text_input("Admin", type="password", label_visibility="collapsed", key="login_pass")
-        if p == "admin123": st.session_state.is_login = True; st.rerun()
+        c_in, c_bt = st.columns([3, 1])
+        with c_in:
+            p = st.text_input("", type="password", placeholder="Nhập mật khẩu Admin...", label_visibility="collapsed", key="login_pass")
+        with c_bt:
+            if st.button("🔓 Login", use_container_width=True):
+                if p == "admin123":
+                    st.session_state.is_login = True; st.rerun()
+                else:
+                    st.toast("Sai mật khẩu!", icon="❌")
     else:
-        st.info("✅ Admin")
         ca1, ca2 = st.columns(2)
         with ca1:
-            if st.button("Ref", key="btn_ref"): st.cache_resource.clear(); st.rerun()
+            if st.button("🔄 Làm mới dữ liệu", key="btn_ref", use_container_width=True): 
+                st.cache_resource.clear(); st.rerun()
         with ca2:
-            if st.button("Out", key="btn_out"): st.session_state.is_login = False; st.rerun()
+            if st.button("🔒 Đăng xuất", key="btn_out", use_container_width=True, type="primary"): 
+                st.session_state.is_login = False; st.rerun()
 
 if sh_obj is not None and not df_raw.empty:
     t1, t2, t3 = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
@@ -114,7 +124,6 @@ if sh_obj is not None and not df_raw.empty:
     def draw(df_in, ks):
         df_a = df_in[~df_in[L_TT].astype(str).str.contains("Đã", na=False)]
         c1, c2, c3 = st.columns([3, 3, 4])
-        # CẬP NHẬT BỘ LỌC ĐẦY ĐỦ
         with c1: pk = st.multiselect("Phân khu", LIST_PK, key=f"p{ks}")
         with c2: lh = st.multiselect("Loại hình", LIST_LH, key=f"l{ks}")
         with c3:
@@ -141,10 +150,10 @@ if sh_obj is not None and not df_raw.empty:
                 tp = st.radio("Loại", ["Bán", "Cho thuê"], horizontal=True)
                 i1, i2, i3 = st.columns(3)
                 with i1:
-                    v_lh = st.selectbox(L_LH, LIST_LH) # CẬP NHẬT FORM ĐĂNG
+                    v_lh = st.selectbox(L_LH, LIST_LH)
                     v_ma = st.text_input(L_MA)
                 with i2:
-                    v_pk = st.selectbox(L_PK, LIST_PK) # CẬP NHẬT FORM ĐĂNG
+                    v_pk = st.selectbox(L_PK, LIST_PK)
                     v_dt = st.number_input(L_DT, 0.0)
                 with i3:
                     v_gi = st.number_input(L_GIA, step=0.1)
@@ -160,3 +169,16 @@ if sh_obj is not None and not df_raw.empty:
                                 if col in dm: row_d[i] = dm[col]
                             sh_obj.append_row(row_d); st.cache_resource.clear(); st.rerun()
                         except: st.error("Lỗi Sheets")
+        else:
+            # GIAO DIỆN DÀNH RIÊNG CHO CỘNG TÁC VIÊN KHI BẤM THÊM HÀNG
+            st.warning("### 🔐 Khu vực dành cho quản trị viên")
+            st.info("""
+            Chào bạn, để đảm bảo tính xác thực của nguồn hàng, chức năng **Thêm hàng** chỉ dành cho tài khoản Admin.
+            
+            **Để cộng tác đăng căn, vui lòng:**
+            1. Liên hệ trực tiếp qua Hotline: **0912.791.925 (Mr. Ninh)**
+            2. Nhập mật khẩu Admin ở góc trên bên phải nếu bạn đã có tài khoản.
+            
+            *Trân trọng cảm ơn!*
+            """)
+            st.button("Quay lại danh sách căn hộ", on_click=lambda: None) # Nút bấm giúp CTV quay về tab 1/2
