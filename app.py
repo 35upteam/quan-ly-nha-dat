@@ -52,41 +52,4 @@ with h2:
         p = st.text_input("Mật khẩu", type="password", label_visibility="collapsed")
         if p == "admin123": st.session_state.is_login = True; st.rerun()
     else:
-        st.info("✅ Chế độ Admin")
-        c_b1, c_b2 = st.columns(2)
-        with c_b1:
-            if st.button("🔄 Làm mới"): st.cache_resource.clear(); st.rerun()
-        with c_b2:
-            if st.button("❌ Thoát"): 
-                st.session_state.is_login = False; st.cache_resource.clear(); st.rerun()
-
-is_adm = st.session_state.is_login
-
-if sh_obj is not None:
-    t1, t2, t3 = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
-    
-    def draw(df_in, ks):
-        df_a = df_in[~df_in[L_TT].astype(str).str.contains("Đã", na=False)]
-        if df_a.empty:
-            st.info("Trống."); return
-
-        # --- TÌM KIẾM NHANH & BỘ LỌC ---
-        st.markdown("### 🔍 Tìm kiếm & Lọc")
-        search_ma = st.text_input(f"Nhập Mã căn để tìm nhanh...", key=f"s_ma_{ks}").strip()
-        
-        c1, c2, c3 = st.columns([3, 3, 4])
-        with c1: pk = st.multiselect("Phân khu", sorted(df_in[L_PK].unique()), key=f"p{ks}")
-        with c2: lh = st.multiselect("Loại hình", sorted(df_in[L_LH].unique()), key=f"l{ks}")
-        with c3:
-            min_v, max_v = float(df_in[L_GIA].min()), float(df_in[L_GIA].max())
-            r_gia = st.slider("Giá (Tỷ)", min_v, max_v, (min_v, max_v), key=f"g{ks}")
-        
-        # Áp dụng logic lọc
-        if search_ma:
-            df_a = df_a[df_a[L_MA].astype(str).str.contains(search_ma, case=False, na=False)]
-        if pk: df_a = df_a[df_a[L_PK].isin(pk)]
-        if lh: df_a = df_a[df_a[L_LH].isin(lh)]
-        df_a = df_a[(df_a[L_GIA] >= r_gia[0]) & (df_a[L_GIA] <= r_gia[1])]
-
-        st.write(f"Tìm thấy {len(df_a)} căn")
-        v_cols = [L_DATE
+        st.info("✅ Ch
