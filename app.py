@@ -33,19 +33,40 @@ def load_data():
 
 df_raw, sh_obj = load_data()
 
+# --- XỬ LÝ ĐĂNG XUẤT ---
+if 'admin_logged_in' not in st.session_state:
+    st.session_state.admin_logged_in = False
+
+def logout():
+    st.session_state.admin_logged_in = False
+    st.rerun()
+
 # --- HEADER (Mật khẩu & Làm mới) ---
 h1, h2 = st.columns([7.5, 2.5])
 with h2:
     s1, s2 = st.columns([4, 1])
     with s1:
-        p_in = st.text_input("Admin", type="password", label_visibility="collapsed", placeholder="Mật khẩu...")
-        is_adm = (p_in == "admin123")
+        # Nếu chưa đăng nhập thì hiện ô nhập, nếu rồi thì ẩn đi
+        if not st.session_state.admin_logged_in:
+            p_in = st.text_input("Admin", type="password", label_visibility="collapsed", placeholder="Mật khẩu...")
+            if p_in == "admin123":
+                st.session_state.admin_logged_in = True
+                st.rerun()
     with s2:
         if st.button("🔄"):
             st.cache_resource.clear()
             st.rerun()
-    if is_adm:
-        st.markdown("<p style='text-align:right;color:green;font-size:12px;margin:0;'>Admin Mode ✅</p>", unsafe_allow_html=True)
+    
+    # Hiển thị trạng thái và nút Thoát (X đỏ)
+    if st.session_state.admin_logged_in:
+        adm_c1, adm_c2 = st.columns([4, 1])
+        with adm_c1:
+            st.markdown("<p style='color:green;font-size:12px;margin-top:5px;'>Admin Mode ✅</p>", unsafe_allow_html=True)
+        with adm_c2:
+            if st.button("❌", help="Thoát chế độ Admin"):
+                logout()
+
+is_adm = st.session_state.admin_logged_in
 
 # --- DIALOG CHI TIẾT ---
 @st.dialog("📋 Chi tiết căn hộ", width="large")
@@ -61,9 +82,9 @@ def show_dt(row, adm):
         st.markdown(f"### 💰 Giá: {row.get('Giá bán', 0):.2f} Tỷ")
         if adm: st.error(f"🔑 MÃ CĂN: {row.get('Mã căn')}")
         st.divider()
-        t = f"🏢 VINHOMES SMART CITY\n📍 Phân khu: {row.get('Phân khu')}\n"
-        t += f"✨ Loại hình: {row.get('Loại hình')}\n📐 Diện tích: {row.get('Diện tích')} m2\n"
-        t += f"💰 Giá: {row.get('Giá bán', 0):.2f} Tỷ\n📞 Liên hệ xem nhà ngay!"
+        t = f"🏢 VINHOMES SMART CITY\n📍 Khu: {row.get('Phân khu')}\n"
+        t += f"✨ Loại: {row.get('Loại hình')}\n📐 DT: {row.get('Diện tích')} m2\n"
+        t += f"💰 Giá: {row.get('Giá bán', 0):.2f} Tỷ\n📞 Liên hệ em xem nhà ngay!"
         st.code(t, language="text")
 
 # --- GIAO DIỆN CHÍNH ---
@@ -92,7 +113,7 @@ if sh_obj is not None:
 
     with t2:
         if is_adm:
-            with st.form("form_add_v3", clear_on_submit=True):
+            with st.form("form_final", clear_on_submit=True):
                 st.write("### 📝 Nhập thông tin căn hộ mới")
                 c1, c2, c3 = st.columns(3)
                 with c1:
@@ -107,13 +128,8 @@ if sh_obj is not None:
                     v_nt = st.selectbox("Nội thất", NT_L)
                     v_hbc = st.selectbox("Hướng ban công", H_L)
                     v_gia = st.number_input("Giá bán (Tỷ)", 0.0, step=0.01)
-                
                 v_anh = st.text_input("Link ảnh")
-                
-                # NÚT SUBMIT - PHẢI NẰM TRONG KHỐI LỆNH 'WITH ST.FORM'
-                btn_save = st.form_submit_button("🚀 Xác nhận lưu hàng")
-                
-                if btn_save:
+                if st.form_submit_button("🚀 Xác nhận lưu hàng"):
                     try:
                         headers = [x.strip() for x in sh_obj.row_values(1)]
                         new_row = [""] * len(headers)
@@ -125,11 +141,9 @@ if sh_obj is not None:
                         }
                         for i, col in enumerate(headers):
                             if col in data_map: new_row[i] = data_map[col]
-                        
                         sh_obj.append_row(new_row)
                         st.success("✅ Đã lưu thành công!")
                         st.cache_resource.clear()
-                    except Exception as e:
-                        st.error(f"Lỗi: {e}")
+                    except Exception as e: st.error(f"Lỗi: {e}")
         else:
-            st.warning("🔒 Nhập mật khẩu Admin để thêm hàng.")
+            st.warning("🔒 Vui lòng nhập mật khẩu Admin ở góc phải để mở form thêm hàng.")
