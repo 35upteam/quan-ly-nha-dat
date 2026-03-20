@@ -15,26 +15,29 @@ def get_data():
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
         
+        # Mở Sheet
         spreadsheet = client.open_by_key("19E9yyhhzLG58UpCU1Y4HAJsFWxG4AoGtGWVi_DkyQdk")
         sheet = spreadsheet.get_worksheet(0)
         
-        raw = sheet.get_all_values()
-        if len(raw) <= 1: return pd.DataFrame(), sheet
+        # Đọc tất cả bản ghi (Dùng get_all_records để tự động lấy tiêu đề làm key)
+        data = sheet.get_all_records()
+        if not data:
+            return pd.DataFrame(), sheet
+            
+        df = pd.DataFrame(data)
         
-        # Định nghĩa 11 cột chuẩn để khớp mọi dữ liệu cũ/mới
-        cols = ["Ngày", "Loại hình", "Phân khu", "Mã căn", "Tầng", "Nội thất", "Hướng", "Giá", "Hiện trạng", "Link ảnh", "Trạng thái"]
-        df = pd.DataFrame(raw[1:])
+        # CHUẨN HÓA TIÊU ĐỀ (Xóa khoảng trắng thừa)
+        df.columns = [str(c).strip() for c in df.columns]
         
-        # Bù cột nếu hàng cũ bị thiếu
-        for i in range(len(df.columns), len(cols)): df[i] = ""
-        df = df.iloc[:, :len(cols)]
-        df.columns = cols
-        
-        # Ép kiểu số cho cột Giá để lọc slider
-        df["Giá"] = pd.to_numeric(df["Giá"], errors='coerce').fillna(0)
+        # CHUẨN HÓA DỮ LIỆU SỐ (Cột Giá bán)
+        # Tìm cột có tên chứa chữ "Giá" để ép kiểu số
+        for col in df.columns:
+            if "Giá" in col:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                
         return df, sheet
     except Exception as e:
-        st.error(f"Lỗi: {e}")
+        st.error(f"Lỗi hệ thống: {e}")
         return pd.DataFrame(), None
 
 df_raw, sheet_obj = get_data()
@@ -44,86 +47,137 @@ with st.sidebar:
     st.header("🔑 Phân quyền")
     pw = st.text_input("Mật khẩu Admin", type="password")
     is_admin = (pw == "admin123")
-    st.info("✅ ADMIN" if is_admin else "💡 CTV")
-    if st.button("🔄 Cập nhật danh sách"):
+    
+    if is_admin:
+        st.success("✅ CHẾ ĐỘ: ADMIN")
+    else:
+        st.info("💡 CHẾ ĐỘ: CTV (Ẩn mã căn)")
+    
+    st.divider()
+    if st.button("🔄 Cập nhật danh sách mới nhất"):
         st.cache_resource.clear()
         st.rerun()
 
 # 4. GIAO DIỆN CHÍNH
 st.title("🏢 Kho Hàng Vinhomes Smart City")
 
-if sheet_obj is not None:
+if sheet_obj is None:
+    st.error("Không thể kết nối Google Sheet. Kiểm tra lại quyền của Service Account.")
+else:
     tab1, tab2 = st.tabs(["📋 Danh sách căn hộ", "➕ Thêm hàng mới"])
 
+    # --- TAB 1: DANH SÁCH ---
     with tab1:
-        # BỘ LỌC ĐẦY ĐỦ
-        c1, c2, c3 = st.columns(3)
-        with c1: pk_f = st.multiselect("Phân khu", ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
-        with c2: lh_f = st.multiselect("Loại hình", ["Studio", "1PN+", "2PN", "2PN+", "3N"])
-        with c3: price_f = st.slider("Giá (Tỷ)", 1.0, 15.0, (1.0, 15.0), step=0.1)
+        # KIỂM TRA NẾU CÓ DỮ LIỆU THÌ HIỆN BỘ LỌC
+        if not df_raw.empty:
+            c1, c2, c3 = st.columns(3)
+            
+            # Lấy danh sách các giá trị duy nhất để làm bộ lọc (tránh lỗi nếu cột không tồn tại)
+            pk_options = sorted(df_raw['Phân khu'].unique().tolist()) if 'Phân khu' in df_raw.columns else []
+            lh_options = sorted(df_raw['Loại hình'].unique().tolist()) if 'Loại hình' in df_raw.columns else []
+            
+            with c1: pk_f = st.multiselect("Lọc Phân khu", options=pk_options)
+            with c2: lh_f = st.multiselect("Lọc Loại hình", options=lh_options)
+            with c3:
+                max_price = float(df_raw['Giá bán'].max()) if 'Giá bán' in df_raw.columns else 15.0
+                price_f = st.slider("Khoảng giá (Tỷ)", 0.0, max(15.0, max_price), (0.0, max(15.0, max_price)), step=0.1)
 
-        if df_raw.empty:
-            st.warning("⚠️ Hiện tại chưa có dữ liệu.")
-        else:
+            # Thực hiện lọc dữ liệu
             df = df_raw.copy()
-            # Thực hiện lọc
             if pk_f: df = df[df['Phân khu'].isin(pk_f)]
             if lh_f: df = df[df['Loại hình'].isin(lh_f)]
-            df = df[(df['Giá'] >= price_f[0]) & (df['Giá'] <= price_f[1])]
+            if 'Giá bán' in df.columns:
+                df = df[(df['Giá bán'] >= price_f[0]) & (df['Giá bán'] <= price_f[1])]
 
-            # Ẩn mã căn nếu là CTV
+            # Xử lý hiển thị (Ẩn mã căn nếu không phải Admin)
             view_df = df.copy()
             if not is_admin and 'Mã căn' in view_df.columns:
                 view_df = view_df.drop(columns=['Mã căn'])
 
-            st.write(f"🔍 Tìm thấy **{len(view_df)}** căn")
+            st.write(f"🔍 Tìm thấy **{len(view_df)}** căn hộ")
             
-            # Hiển thị bảng có chức năng chọn dòng (selection)
-            sel = st.dataframe(view_df, use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row")
+            # Hiển thị bảng
+            sel = st.dataframe(
+                view_df, 
+                use_container_width=True, 
+                hide_index=True, 
+                on_select="rerun", 
+                selection_mode="single-row"
+            )
 
-            # HIỂN THỊ CHI TIẾT KHI CHỌN DÒNG
+            # HIỂN THỊ CHI TIẾT KHI CLICK CHỌN DÒNG
             if sel and sel.selection.rows:
                 idx = sel.selection.rows[0]
                 row = df.iloc[idx]
                 st.divider()
-                col_a, col_b = st.columns(2)
+                col_a, col_b = st.columns([1, 1])
                 with col_a:
-                    if row.get('Link ảnh'): st.image(row['Link ảnh'], use_container_width=True, caption="Ảnh thực tế")
-                    else: st.info("Căn hộ này chưa có ảnh.")
+                    img_url = row.get('Link ảnh') or row.get('Ảnh')
+                    if img_url:
+                        st.image(img_url, use_container_width=True, caption="Ảnh thực tế căn hộ")
+                    else:
+                        st.info("Căn hộ này chưa có ảnh.")
                 with col_b:
-                    st.subheader(f"{row.get('Loại hình')} - {row.get('Phân khu')}")
-                    st.write(f"💰 Giá: **{row.get('Giá')} Tỷ**")
-                    st.write(f"📐 Tầng: {row.get('Tầng')} | 🧭 Hướng: {row.get('Hướng')}")
-                    st.write(f"🛋️ Nội thất: {row.get('Nội thất')} | 🏠 Hiện trạng: {row.get('Hiện trạng')}")
-                    if is_admin: st.error(f"🔑 MÃ CĂN NỘI BỘ: {row.get('Mã căn')}")
+                    st.subheader(f"{row.get('Loại hình','-')} - Phân khu {row.get('Phân khu','-')}")
+                    st.markdown(f"💰 Giá bán: **{row.get('Giá bán',0)} Tỷ**")
+                    st.write(f"📐 Tầng: {row.get('Khoảng tầng','-')} | 🧭 Hướng: {row.get('Hướng BC','-')}")
+                    st.write(f"🛋️ Nội thất: {row.get('Nội thất','-')} | 🏠 Hiện trạng: {row.get('Hiện trạng','-')}")
+                    
+                    if is_admin:
+                        st.error(f"🔑 MÃ CĂN NỘI BỘ: {row.get('Mã căn','N/A')}")
+                    
                     st.button("🔗 Sao chép thông tin gửi khách")
+        else:
+            st.warning("⚠️ Hiện tại chưa có dữ liệu nào trong bảng tính. Hãy sang Tab 'Thêm hàng mới' để nhập.")
 
+    # --- TAB 2: THÊM MỚI ---
     with tab2:
         if is_admin:
             with st.form("add_form", clear_on_submit=True):
-                st.write("### Nhập căn hộ mới")
+                st.write("### 📝 Nhập thông tin căn hộ mới")
                 f1, f2, f3 = st.columns(3)
                 with f1:
-                    ngay = st.date_input("Ngày lên hàng")
-                    loai = st.selectbox("Loại hình", ["Studio", "1PN+", "2PN", "2PN+", "3N"])
-                    pk_n = st.selectbox("Phân khu", ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
+                    f_ngay = st.date_input("Ngày lên hàng")
+                    f_loai = st.selectbox("Loại hình", ["Studio", "1PN+", "2PN", "2PN+", "3N"])
+                    f_pk = st.selectbox("Phân khu", ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
                 with f2:
-                    ma = st.text_input("Mã căn")
-                    tg = st.selectbox("Khoảng tầng", ["Thấp", "Trung", "Cao"])
-                    gia = st.number_input("Giá (Tỷ)", value=3.5, step=0.1)
+                    f_ma = st.text_input("Mã căn (Dành cho Admin)")
+                    f_tang = st.selectbox("Khoảng tầng", ["Thấp", "Trung", "Cao"])
+                    f_gia = st.number_input("Giá bán (Tỷ)", value=3.5, step=0.1)
                 with f3:
-                    nt = st.text_input("Nội thất")
-                    h_bc = st.text_input("Hướng BC")
-                    anh = st.text_input("Link ảnh")
-                    tt = st.radio("Trạng thái", ["Đang bán", "Đã bán"], horizontal=True)
+                    f_nt = st.text_input("Nội thất")
+                    f_huong = st.text_input("Hướng ban công")
+                    f_anh = st.text_input("Link ảnh")
                 
-                if st.form_submit_button("🚀 Lưu dữ liệu"):
+                if st.form_submit_button("🚀 Lưu vào hệ thống"):
                     try:
-                        # Ghi đủ 11 cột để đồng bộ với hàng cũ
-                        sheet_obj.append_row([str(ngay), loai, pk_n, ma, tg, nt, h_bc, gia, "Trống", anh, tt])
-                        st.success("Đã lưu! Hãy bấm 'Cập nhật danh sách' ở Sidebar.")
+                        # Tự động lấy danh sách tiêu đề hiện có trên Sheet để ghi cho đúng vị trí
+                        headers = sheet_obj.row_values(1)
+                        new_row = [""] * len(headers)
+                        
+                        # Khớp dữ liệu vào đúng cột dựa trên tên tiêu đề
+                        mapping = {
+                            "Ngày lên hàng": str(f_ngay),
+                            "Loại hình": f_loai,
+                            "Phân khu": f_pk,
+                            "Mã căn": f_ma,
+                            "Khoảng tầng": f_tang,
+                            "Nội thất": f_nt,
+                            "Hướng BC": f_huong,
+                            "Giá bán": f_gia,
+                            "Link ảnh": f_anh,
+                            "Trạng thái": "Đang bán"
+                        }
+                        
+                        for i, h in enumerate(headers):
+                            h_clean = h.strip()
+                            if h_clean in mapping:
+                                new_row[i] = mapping[h_clean]
+                        
+                        sheet_obj.append_row(new_row)
+                        st.success("Đã lưu thành công! Hãy bấm 'Cập nhật danh sách' ở thanh bên trái.")
                         st.cache_resource.clear()
                     except Exception as e:
-                        st.error(f"Lỗi: {e}")
+                        st.error(f"Lỗi khi lưu: {e}")
         else:
-            st.warning("Vui lòng nhập mật khẩu Admin ở thanh bên để thêm hàng.")
+            st.warning("⚠️ Bạn cần nhập mật khẩu Admin để sử dụng tính năng thêm hàng.")
