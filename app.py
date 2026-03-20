@@ -85,7 +85,6 @@ def update_status(row_data):
         col_idx = headers.index(L12) + 1
         all_ma_can = sh_obj.col_values(headers.index(L3) + 1)
         row_idx = all_ma_can.index(row_data[L3]) + 1
-        
         new_st = "Đã bán" if row_data[L_TYPE] == "Bán" else "Đã cho thuê"
         sh_obj.update_cell(row_idx, col_idx, new_st)
         st.success(f"🎉 Đã chốt căn {row_data[L3]}!")
@@ -106,64 +105,4 @@ def show_dt(row, adm):
                 if 'curr_img' not in st.session_state: st.session_state.curr_img = 0
                 idx = st.session_state.curr_img % len(img_list)
                 st.image(img_list[idx], use_container_width=True)
-                b1, b2, b3 = st.columns([1, 2, 1])
-                with b1:
-                    if st.button("⬅️"): st.session_state.curr_img -= 1; st.rerun()
-                with b2: st.write(f"Ảnh {idx + 1}/{len(img_list)}")
-                with b3:
-                    if st.button("➡️"): st.session_state.curr_img += 1; st.rerun()
-            else: st.image(img_list[0], use_container_width=True)
-        else: st.info("Chưa có ảnh")
-    with c2:
-        st.subheader(f"{row.get(L2)} - {row.get(L1)}")
-        st.success(f"💰 Giá: {row.get(L8)}")
-        st.info(f"📍 Hiện trạng: {row.get(L10, 'N/A')}")
-        if row.get(L11): st.write(f"📝 {row[L11]}")
-        if adm: 
-            st.error(f"🔑 {L3}: {row.get(L3)}")
-            st.divider()
-            # CƠ CHẾ XÁC NHẬN 2 BƯỚC
-            if f"confirm_{row[L3]}" not in st.session_state:
-                st.session_state[f"confirm_{row[L3]}"] = False
-            
-            if not st.session_state[f"confirm_{row[L3]}"]:
-                if st.button("✅ ĐÃ CHỐT CĂN NÀY", use_container_width=True, type="primary"):
-                    st.session_state[f"confirm_{row[L3]}"] = True
-                    st.rerun()
-            else:
-                st.warning("⚠️ Bạn chắc chắn muốn chốt căn này chứ?")
-                col_y, col_n = st.columns(2)
-                with col_y:
-                    if st.button("Xác nhận", use_container_width=True, type="primary"):
-                        update_status(row)
-                        st.session_state[f"confirm_{row[L3]}"] = False
-                with col_n:
-                    if st.button("Hủy", use_container_width=True):
-                        st.session_state[f"confirm_{row[L3]}"] = False
-                        st.rerun()
-        st.divider()
-        st.code(f"🏢 VINHOMES\n📍 {row.get(L1)}\n✨ {row.get(L2)}\n💰 {row.get(L8)}\n🏠 {row.get(L10)}")
-
-# --- GIAO DIỆN CHÍNH ---
-if sh_obj is not None:
-    t_ban, t_thue, t_add = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
-    
-    def draw_list(df_filter, key_s):
-        df_display = df_filter[~df_filter[L12].isin(["Đã bán", "Đã cho thuê"])]
-        if df_display.empty:
-            st.info("Hiện chưa có căn nào.")
-            return
-
-        f1, f2 = st.columns(2)
-        with f1: pk = st.multiselect(f"{L1}", PK_L, key=f"pk_{key_s}")
-        with f2: lh = st.multiselect(f"{L2}", LH_L, key=f"lh_{key_s}")
-        
-        if pk: df_display = df_display[df_display[L1].isin(pk)]
-        if lh: df_display = df_display[df_display[L2].isin(lh)]
-        
-        cols_drop = [L9, L_TYPE, L12]
-        if not is_adm: cols_drop.append(L3)
-        final_df = df_display.drop(columns=[c for c in cols_drop if c in df_display.columns], errors='ignore')
-        
-        st.write(f"Tìm thấy {len(df_display)} căn")
-        sel = st.dataframe(final_df, use_container_width=True, hide_index=True, on_select="rer
+                b1, b
