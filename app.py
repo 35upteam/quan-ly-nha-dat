@@ -8,6 +8,7 @@ import base64
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
 # --- DANH MỤC NHÃN ---
+L_TYPE = "Phân loại" # Cột mới để phân biệt Bán/Thuê
 L1, L2, L3 = "Phân khu", "Loại hình", "Mã căn"
 L4, L5, L6 = "Diện tích", "Khoảng tầng", "Nội thất"
 L7, L8, L9 = "Hướng BC", "Giá bán", "Link ảnh"
@@ -20,7 +21,6 @@ NT_L = ["Nguyên bản", "Cơ bản", "Full đồ"]
 TG_L = ["Thấp", "Trung", "Cao"]
 HT_L = ["Đang ở", "Đang cho thuê", "Để trống"]
 
-# --- HÀM UPLOAD NHIỀU ẢNH (LINK THUMBNAIL) ---
 def upload_multiple_imgs(files):
     if not files: return ""
     try:
@@ -49,8 +49,7 @@ def load_data():
         r = sh.get_all_values()
         if not r: return pd.DataFrame(), sh
         df = pd.DataFrame(r[1:], columns=[h.strip() for h in r[0]])
-        if L8 in df.columns:
-            df[L8] = pd.to_numeric(df[L8].str.replace(',', '.'), errors='coerce').fillna(0)
+        # Bỏ chuyển đổi số cho L8 để nhập Text tự do
         return df.iloc[::-1].reset_index(drop=True), sh
     except: return pd.DataFrame(), None
 
@@ -65,7 +64,7 @@ with h2:
     s1, s2 = st.columns([5, 1])
     with s1:
         if not st.session_state.is_login:
-            p = st.text_input("A", type="password", label_visibility="collapsed", placeholder="Pass...")
+            p = st.text_input("Pass", type="password", label_visibility="collapsed", placeholder="Pass...")
             if p == "admin123":
                 st.session_state.is_login = True
                 st.rerun()
@@ -79,8 +78,7 @@ with h2:
 
 is_adm = st.session_state.is_login
 
-# --- CỬA SỔ CHI TIẾT ---
-@st.dialog("📋 Chi tiết căn hộ")
+@st.dialog("📋 Chi tiết")
 def show_dt(row, adm):
     c1, c2 = st.columns([1.2, 1])
     with c1:
@@ -93,54 +91,58 @@ def show_dt(row, adm):
                 b1, b2, b3 = st.columns([1, 3, 1])
                 with b1:
                     if st.button("⬅️"): st.session_state.curr_img = (st.session_state.curr_img - 1) % len(img_list); st.rerun()
-                with b2: st.markdown(f"<p style='text-align:center;'>Ảnh {st.session_state.curr_img + 1}/{len(img_list)}</p>", unsafe_allow_html=True)
+                with b2: st.markdown(f"<p style='text-align:center;'>{st.session_state.curr_img + 1}/{len(img_list)}</p>", unsafe_allow_html=True)
                 with b3:
                     if st.button("➡️"): st.session_state.curr_img = (st.session_state.curr_img + 1) % len(img_list); st.rerun()
             else: st.image(img_list[0], use_container_width=True)
-        else: st.info("Chưa có ảnh thực tế")
+        else: st.info("Chưa có ảnh")
     with c2:
         st.subheader(f"{row.get(L2)} - {row.get(L1)}")
         st.write(f"📐 {row.get(L4)}m2 | 🧭 {row.get(L7)}")
-        st.markdown(f"### 💰 {row.get(L8, 0):.2f} Tỷ")
+        st.success(f"💰 Giá: {row.get(L8)}")
         st.info(f"📍 Hiện trạng: {row.get(L10, 'N/A')}")
         if row.get(L11): st.write(f"📝 Ghi chú: {row[L11]}")
         if adm: st.error(f"🔑 {L3}: {row.get(L3)}")
         st.divider()
-        st.code(f"🏢 VINHOMES\n📍 {row.get(L1)}\n✨ {row.get(L2)}\n💰 {row.get(L8)} Tỷ\n🏠 {row.get(L10)}")
+        st.code(f"🏢 VINHOMES\n📍 {row.get(L1)}\n✨ {row.get(L2)}\n💰 {row.get(L8)}\n🏠 {row.get(L10)}")
 
-# --- NỘI DUNG CHÍNH ---
+# --- GIAO DIỆN CHÍNH ---
 if sh_obj is not None:
-    t1, t2 = st.tabs(["📋 Danh sách hàng", "➕ Đăng căn mới"])
-    with t1:
-        f1, f2, f3 = st.columns(3)
-        with f1: pk = st.multiselect(L1, PK_L)
-        with f2: lh = st.multiselect(L2, LH_L)
-        with f3: pr = st.slider(L8, 0.0, 15.0, (0.0, 15.0), 0.1)
+    tab_ban, tab_thue, tab_add = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
+    
+    # Hàm hiển thị danh sách dùng chung
+    def draw_list(df_filter, key_suffix):
+        f1, f2 = st.columns(2)
+        with f1: pk = st.multiselect(f"{L1} ({key_suffix})", PK_L, key=f"pk_{key_suffix}")
+        with f2: lh = st.multiselect(f"{L2} ({key_suffix})", LH_L, key=f"lh_{key_suffix}")
         
-        df = df_raw.copy()
-        if pk: df = df[df[L1].isin(pk)]
-        if lh: df = df[df[L2].isin(lh)]
-        df = df[(df[L8] >= pr[0]) & (df[L8] <= pr[1])]
+        if pk: df_filter = df_filter[df_filter[L1].isin(pk)]
+        if lh: df_filter = df_filter[df_filter[L2].isin(lh)]
         
-        # --- LOGIC HIỂN THỊ CỘT THEO QUYỀN ---
-        # 1. Luôn bỏ cột Link ảnh (L9) khỏi bảng danh sách
-        cols_to_drop = [L9]
+        cols_to_drop = [L9, L_TYPE]
+        if not is_adm: cols_to_drop.append(L3)
+        display_df = df_filter.drop(columns=[c for c in cols_to_drop if c in df_filter.columns])
         
-        # 2. Nếu KHÔNG PHẢI Admin, bỏ thêm cột Mã căn (L3)
-        if not is_adm:
-            cols_to_drop.append(L3)
-            
-        display_df = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
-        
-        st.write(f"Tìm thấy {len(df)} căn")
-        sel = st.dataframe(display_df, use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row")
+        st.write(f"Tìm thấy {len(df_filter)} căn")
+        sel = st.dataframe(display_df, use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row", key=f"df_{key_suffix}")
         if sel and sel.selection.rows:
             st.session_state.curr_img = 0
-            show_dt(df.iloc[sel.selection.rows[0]], is_adm)
+            show_dt(df_filter.iloc[sel.selection.rows[0]], is_adm)
 
-    with t2:
+    with tab_ban:
+        df_b = df_raw[df_raw[L_TYPE] == "Bán"] if L_TYPE in df_raw.columns else df_raw
+        draw_list(df_b, "ban")
+
+    with tab_thue:
+        df_t = df_raw[df_raw[L_TYPE] == "Cho thuê"] if L_TYPE in df_raw.columns else pd.DataFrame()
+        draw_list(df_t, "thue")
+
+    with tab_add:
         if is_adm:
-            with st.form("form_v17_2", clear_on_submit=True):
+            with st.form("form_v18", clear_on_submit=True):
+                # Trường quan trọng nhất: Chọn loại hình
+                v_type = st.radio("Loại hình đăng bài:", ["Bán", "Cho thuê"], horizontal=True)
+                st.divider()
                 i1, i2, i3 = st.columns(3)
                 with i1:
                     v_ng = st.date_input("Ngày lên hàng")
@@ -150,23 +152,23 @@ if sh_obj is not None:
                     v_tg = st.selectbox(L5, TG_L)
                 with i3:
                     v_nt = st.selectbox(L6, NT_L); v_hb = st.selectbox(L7, H_L)
-                    v_gi = st.number_input(L8, 0.0, step=0.01)
-                c_new1, c_new2 = st.columns([1, 2])
-                with c_new1: v_ht = st.selectbox(L10, HT_L)
-                with c_new2: v_gc = st.text_input(L11, placeholder="Ghi chú thêm...")
-                f_up = st.file_uploader("📸 Chọn nhiều ảnh", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
+                    v_gi = st.text_input(L8, placeholder="VD: 4.5 tỷ hoặc 7 tr/tháng")
+                
+                c_n1, c_n2 = st.columns([1, 2])
+                with c_n1: v_ht = st.selectbox(L10, HT_L)
+                with c_new2: v_gc = st.text_input(L11)
+                
+                f_up = st.file_uploader("📸 Ảnh", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
                 
                 if st.form_submit_button("🚀 Lưu dữ liệu"):
-                    imgs_url_str = ""
-                    if f_up:
-                        with st.spinner("Đang tải ảnh..."): imgs_url_str = upload_multiple_imgs(f_up)
+                    imgs = upload_multiple_imgs(f_up) if f_up else ""
                     try:
                         cols = [c.strip() for c in sh_obj.row_values(1)]
                         new_row = [""] * len(cols)
-                        data_map = {"Ngày lên hàng": str(v_ng), L2: v_lh, L1: v_pk, L3: v_ma, L4: v_dt, L5: v_tg, L6: v_nt, L7: v_hb, L8: v_gi, L9: imgs_url_str, L10: v_ht, L11: v_gc, "Trạng thái": "Đang bán"}
+                        data_map = {L_TYPE: v_type, "Ngày lên hàng": str(v_ng), L2: v_lh, L1: v_pk, L3: v_ma, L4: v_dt, L5: v_tg, L6: v_nt, L7: v_hb, L8: v_gi, L9: imgs, L10: v_ht, L11: v_gc, "Trạng thái": "Đang bán"}
                         for idx, col_name in enumerate(cols):
                             if col_name in data_map: new_row[idx] = data_map[col_name]
                         sh_obj.append_row(new_row)
-                        st.success("✅ Đã lưu xong!"); st.cache_resource.clear(); st.rerun()
-                    except Exception as e: st.error(f"Lỗi Sheets: {e}")
-        else: st.warning("Vui lòng nhập mật khẩu Admin để sử dụng tính năng này.")
+                        st.success("✅ Đã lưu!"); st.cache_resource.clear(); st.rerun()
+                    except Exception as e: st.error(f"Lỗi: {e}")
+        else: st.warning("Cần Pass Admin")
