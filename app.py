@@ -6,7 +6,7 @@ import requests, base64
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
-# Khai báo nhãn (Tránh dùng Emoji trong code logic)
+# Nhãn cột (Rút ngắn để tránh dòng quá dài)
 L_TYPE, L1, L2, L3 = "Phan loai", "Phan khu", "Loai hinh", "Ma can"
 L4, L5, L6, L7, L8, L9 = "Dien tich", "Tang", "Noi that", "Huong", "Gia", "Anh"
 L10, L11, L12 = "Hien trang", "Ghi chu", "Trang thai"
@@ -22,12 +22,12 @@ def up_img(fs):
     if not fs: return ""
     try:
         ak = st.secrets.get("imgbb_api_key") or st.secrets.get("gcp_service_account", {}).get("imgbb_api_key")
-        res_ls = []
+        res = []
         for f in fs:
             f.seek(0); b6 = base64.b64encode(f.read()).decode('utf-8')
             r = requests.post("https://api.imgbb.com/1/upload", {"key": ak, "image": b6}, timeout=20)
-            if r.status_code == 200: res_ls.append(r.json()['data']['thumb']['url']) 
-        return ",".join(res_ls)
+            if r.status_code == 200: res.append(r.json()['data']['thumb']['url']) 
+        return ",".join(res)
     except: return ""
 
 @st.cache_resource
@@ -53,12 +53,12 @@ with h2:
         p = st.text_input("P", type="password", label_visibility="collapsed")
         if p == "admin123": st.session_state.is_login = True; st.rerun()
     else:
-        if st.button("Refresh / Logout"): st.cache_resource.clear(); st.rerun()
+        if st.button("Refresh"): st.cache_resource.clear(); st.rerun()
 
 is_adm = st.session_state.is_login
 
 if sh_obj is not None:
-    t1, t2, t3 = st.tabs(["Ban", "Thue", "Them hang"])
+    t1, t2, t3 = st.tabs(["Ban", "Thue", "Them"])
     def draw(df_in, ks):
         df_a = df_in[~df_in[L12].astype(str).str.contains("Da", na=False)]
         if df_a.empty: 
@@ -88,17 +88,4 @@ if sh_obj is not None:
                             if st.button(">>", key=f"nex{ks}"): st.session_state.ci += 1; st.rerun()
                 else: st.info("No Image")
             with c2:
-                st.subheader(f"{row[L2]} - {row[L1]}"); st.write(f"Gia: {row[L8]}")
-                if is_adm:
-                    st.divider(); ck = f"cf_{row[L3]}"
-                    if ck not in st.session_state: st.session_state[ck] = False
-                    if not st.session_state[ck]:
-                        if st.button("CHOT CAN NAY", use_container_width=True, type="primary", key=f"bc{ks}"):
-                            st.session_state[ck] = True; st.rerun()
-                    else:
-                        st.warning("Xac nhan chot?"); cy, cn = st.columns(2)
-                        with cy:
-                            if st.button("OK", use_container_width=True, key=f"y{ks}"):
-                                try:
-                                    h = [x.strip() for x in sh_obj.row_values(1)]; ids = sh_obj.col_values(h.index(L3)+1); ridx = ids.index(row[L3])+1
-                                    val = "Da ban" if row[L_TYPE]=="Bán" or row[L_TYPE]=="Ban" else "Da
+                st.subheader(f"{row[L2]} - {row[L1]}"); st.write(f"Gia
