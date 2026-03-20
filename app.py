@@ -13,6 +13,19 @@ L_GIA, L_HT, L_TT, L_IMG = "Giá bán", "Hiện trạng", "Trạng thái", "Link
 L_TYPE, L_GC = "Phân loại", "Ghi chú"
 V_SOLD, V_RENT = "Đã bán", "Đã thuê"
 
+# --- HÀM TRỢ GIÚP (QUAN TRỌNG: FIX LỖI NAMEERROR) ---
+def up_img(fs):
+    if not fs: return ""
+    try:
+        ak = st.secrets.get("imgbb_api_key")
+        res = []
+        for f in fs:
+            f.seek(0); b6 = base64.b64encode(f.read()).decode('utf-8')
+            r = requests.post("https://api.imgbb.com/1/upload", {"key": ak, "image": b6}, timeout=20)
+            if r.status_code == 200: res.append(r.json()['data']['url']) # Lấy link ảnh gốc
+        return ",".join(res)
+    except: return ""
+
 # --- HÀM XỬ LÝ CHUYỂN ẢNH (CALLBACK) ---
 def change_img(step, total):
     st.session_state.ci = (st.session_state.get('ci', 0) + step) % total
@@ -113,14 +126,14 @@ if sh_obj is not None and not df_raw.empty:
         if lh: df_a = df_a[df_a[L_LH].isin(lh)]
         df_a = df_a[(df_a[L_GIA] >= r_gia[0]) & (df_a[L_GIA] <= r_gia[1])]
         
-        # --- DÒNG ĐẾM CHỈNH SỬA DUY NHẤT Ở ĐÂY ---
+        # Dòng đếm số lượng (Chữ đen, thoáng)
         st.markdown(f"<div style='padding: 15px 0px; font-weight: bold; font-size: 17px;'>🔍 Đang hiển thị: {len(df_a)} căn hộ phù hợp</div>", unsafe_allow_html=True)
         
         v_cols = [L_DATE, L_LH, L_PK, L_DT, L_GIA, L_TT]
         if is_adm: v_cols.append(L_MA)
         sel = st.dataframe(df_a[v_cols], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row", key=f"df{ks}")
         if sel and sel.selection.rows:
-            st.session_state.ci = 0 # Trả về đúng cấu trúc v23.7
+            st.session_state.ci = 0
             show_dt(df_a.iloc[sel.selection.rows[0]], ks)
 
     with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Bán|Ban", na=False)], "B")
@@ -142,11 +155,11 @@ if sh_obj is not None and not df_raw.empty:
                 v_gc = st.text_input(L_GC); up = st.file_uploader("Ảnh", accept_multiple_files=True)
                 if st.form_submit_button("🚀 ĐĂNG CĂN"):
                     if v_ma:
-                        imgs = up_img(up)
+                        imgs = up_img(up) # Đã có hàm xử lý ở trên
                         try:
                             h = list(df_raw.columns); row_d = [""] * len(h)
                             dm = {L_TYPE:tp, L_DATE:str(pd.Timestamp.now().date()), L_LH:v_lh, L_PK:v_pk, L_MA:v_ma, L_DT:v_dt, L_GIA:v_gi, L_HT:v_ht, L_GC:v_gc, L_TT:"Đang bán", L_IMG:imgs}
                             for i, col in enumerate(h):
                                 if col in dm: row_d[i] = dm[col]
                             sh_obj.append_row(row_d); st.cache_resource.clear(); st.rerun()
-                        except: st.error("Lỗi Sheets")
+                        except: st.error("Lỗi kết nối Google Sheets")
