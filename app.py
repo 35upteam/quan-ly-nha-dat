@@ -13,18 +13,9 @@ L_GIA, L_HT, L_TT, L_IMG = "Giá bán", "Hiện trạng", "Trạng thái", "Link
 L_TYPE, L_GC = "Phân loại", "Ghi chú"
 V_SOLD, V_RENT = "Đã bán", "Đã thuê"
 
-# --- HÀM TRỢ GIÚP ---
-def up_img(fs):
-    if not fs: return ""
-    try:
-        ak = st.secrets.get("imgbb_api_key")
-        res = []
-        for f in fs:
-            f.seek(0); b6 = base64.b64encode(f.read()).decode('utf-8')
-            r = requests.post("https://api.imgbb.com/1/upload", {"key": ak, "image": b6}, timeout=20)
-            if r.status_code == 200: res.append(r.json()['data']['thumb']['url']) 
-        return ",".join(res)
-    except: return ""
+# --- HÀM XỬ LÝ CHUYỂN ẢNH (CALLBACK) ---
+def change_img(step, total):
+    st.session_state.ci = (st.session_state.get('ci', 0) + step) % total
 
 @st.cache_resource
 def load_data():
@@ -45,7 +36,7 @@ df_raw, sh_obj = load_data()
 if 'is_login' not in st.session_state: st.session_state.is_login = False
 is_adm = st.session_state.is_login
 
-# --- DIALOG CHI TIẾT (ĐÃ ĐƯA RA NGOÀI HÀM DRAW ĐỂ HẾT LỖI ID) ---
+# --- DIALOG CHI TIẾT ---
 @st.dialog("Chi tiết căn hộ")
 def show_dt(row, ks):
     mid = str(row.get(L_MA, "0"))
@@ -54,17 +45,16 @@ def show_dt(row, ks):
         imgs = str(row.get(L_IMG, "")).split(',') if row.get(L_IMG) else []
         if imgs and imgs[0]:
             if 'ci' not in st.session_state: st.session_state.ci = 0
-            ix = st.session_state.ci % len(imgs); st.image(imgs[ix], use_container_width=True)
-            if len(imgs) > 1:
+            total = len(imgs)
+            ix = st.session_state.ci % total
+            st.image(imgs[ix], use_container_width=True, caption=f"Ảnh {ix+1}/{total}")
+            
+            if total > 1:
                 b1, b2 = st.columns(2)
                 with b1:
-                    if st.button("⬅️ Trước", key=f"p_{mid}"): 
-                        st.session_state.ci = (st.session_state.ci - 1) % len(imgs)
-                        st.rerun()
+                    st.button("⬅️ Trước", key=f"p_{mid}", on_click=change_img, args=(-1, total))
                 with b2:
-                    if st.button("Sau ➡️", key=f"n_{mid}"): 
-                        st.session_state.ci = (st.session_state.ci + 1) % len(imgs)
-                        st.rerun()
+                    st.button("Sau ➡️", key=f"n_{mid}", on_click=change_img, args=(1, total))
         else: st.info("Không có ảnh")
     with cl2:
         st.subheader(f"{row[L_LH]} - {row[L_PK]}")
@@ -97,15 +87,15 @@ h1, h2 = st.columns([7, 3])
 with h1: st.title("🏢 Vinhomes Manager")
 with h2:
     if not is_adm:
-        p = st.text_input("Admin", type="password", label_visibility="collapsed")
+        p = st.text_input("Admin", type="password", label_visibility="collapsed", key="login_pass")
         if p == "admin123": st.session_state.is_login = True; st.rerun()
     else:
         st.info("✅ Admin")
         ca1, ca2 = st.columns(2)
         with ca1:
-            if st.button("Ref"): st.cache_resource.clear(); st.rerun()
+            if st.button("Ref", key="btn_ref"): st.cache_resource.clear(); st.rerun()
         with ca2:
-            if st.button("Out"): st.session_state.is_login = False; st.rerun()
+            if st.button("Out", key="btn_out"): st.session_state.is_login = False; st.rerun()
 
 if sh_obj is not None and not df_raw.empty:
     t1, t2, t3 = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
@@ -127,7 +117,12 @@ if sh_obj is not None and not df_raw.empty:
         if is_adm: v_cols.append(L_MA)
         sel = st.dataframe(df_a[v_cols], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row", key=f"df{ks}")
         if sel and sel.selection.rows:
-            st.session_state.ci = 0; show_dt(df_a.iloc[sel.selection.rows[0]], ks)
+            # Reset index ảnh về 0 khi chọn căn mới
+            row_sel = df_a.iloc[sel.selection.rows[0]]
+            if st.session_state.get('last_ma') != row_sel[L_MA]:
+                st.session_state.ci = 0
+                st.session_state.last_ma = row_sel[L_MA]
+            show_dt(row_sel, ks)
 
     with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Bán|Ban", na=False)], "B")
     with t2: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Thuê|Thue", na=False)], "T")
