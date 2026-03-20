@@ -3,57 +3,92 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 
-# 1. CẤU HÌNH TRANG
-st.set_page_config(page_title="Vinhomes Smart City Manager", layout="wide", page_icon="🏢")
+# 1. THIẾT LẬP KẾT NỐI
+st.set_page_config(page_title="Vinhomes Smart City", layout="wide")
 
-# 2. KẾT NỐI DỮ LIỆU
 @st.cache_resource
 def get_data():
     try:
-        creds_dict = st.secrets["gcp_service_account"]
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"])
         client = gspread.authorize(creds)
-        
-        SHEET_ID = "19E9yyhhzLG58UpCU1Y4HAJsFWxG4AoGtGWVi_DkyQdk"
-        sheet_instance = client.open_by_key(SHEET_ID).sheet1
-        
-        records = sheet_instance.get_all_records()
-        if not records: return pd.DataFrame(), sheet_instance
-            
-        df = pd.DataFrame(records)
+        sheet = client.open_by_key("19E9yyhhzLG58UpCU1Y4HAJsFWxG4AoGtGWVi_DkyQdk").sheet1
+        df = pd.DataFrame(sheet.get_all_records())
         df.columns = df.columns.str.strip()
         if 'Giá bán' in df.columns:
             df['Giá bán'] = pd.to_numeric(df['Giá bán'], errors='coerce').fillna(0)
-        return df, sheet_instance
+        return df, sheet
     except Exception as e:
-        st.error(f"Lỗi: {e}")
+        st.error(f"Lỗi kết nối: {e}")
         return pd.DataFrame(), None
 
 df_raw, sheet_obj = get_data()
 
-# 3. THANH BÊN (SIDEBAR)
+# 2. PHÂN QUYỀN (SIDEBAR)
 with st.sidebar:
-    st.header("🔑 Phân quyền")
-    admin_pass = st.text_input("Mật khẩu Admin", type="password")
-    is_admin = (admin_pass == "admin123")
-    st.success("ADMIN" if is_admin else "CTV (Ẩn mã căn)")
+    st.title("🔑 Đăng nhập")
+    pw = st.text_input("Mật khẩu Admin", type="password")
+    is_admin = (pw == "admin123")
+    st.info("Quyền: ADMIN" if is_admin else "Quyền: CTV")
 
-# 4. GIAO DIỆN CHÍNH
+# 3. GIAO DIỆN CHÍNH
 st.title("🏢 Kho Hàng Vinhomes Smart City")
 
 if sheet_obj is not None:
-    tab1, tab2 = st.tabs(["📋 Danh sách", "➕ Thêm hàng"])
-
-    with tab1:
+    t1, t2 = st.tabs(["📋 Danh sách", "➕ Thêm hàng"])
+    
+    with t1:
         if df_raw.empty:
-            st.info("Chưa có dữ liệu.")
+            st.warning("Chưa có dữ liệu.")
         else:
+            # Bộ lọc nhanh
             c1, c2, c3 = st.columns(3)
-            with c1: pk_f = st.multiselect("Phân khu", ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
-            with c2: lh_f = st.multiselect("Loại hình", ["Studio", "1PN+", "2PN", "2PN+", "3N"])
-            with c3: price_f = st.slider("Giá (Tỷ)", 1.5, 10.0, (2.0, 5.0), step=0.1)
+            with c1: pk = st.multiselect("Phân khu", ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
+            with c2: lh = st.multiselect("Loại hình", ["Studio", "1PN+", "2PN", "2PN+", "3N"])
+            with c3: gia = st.slider("Giá (Tỷ)", 1.5, 10.0, (2.0, 5.0))
 
+            # Lọc dữ liệu
             df_f = df_raw.copy()
-            if pk_f: df_f = df_f[df_f['Phân khu'].isin(pk_f)]
-            if
+            if pk: df_f = df_f[df_f['Phân khu'].isin(pk)]
+            if lh: df_f = df_f[df_f['Loại hình'].isin(lh)]
+            df_f = df_f[(df_f['Giá bán'] >= gia[0]) & (df_f['Giá bán'] <= gia[1])]
+
+            # Ẩn mã căn nếu là CTV
+            view_df = df_f.drop(columns=['Mã căn']) if (not is_admin and 'Mã căn' in df_f.columns) else df_f
+            
+            # Hiển thị bảng
+            sel = st.dataframe(view_df, use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row")
+
+            # Hiện chi tiết khi bấm vào dòng
+            if sel and sel.selection.rows:
+                row = df_f.iloc[sel.selection.rows[0]]
+                st.divider()
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    if row.get('Link ảnh'): st.image(row['Link ảnh'], use_container_width=True)
+                with col_b:
+                    st.subheader(f"{row.get('Loại hình')} - {row.get('Phân khu')}")
+                    st.write(f"💰 Giá: **{row.get('Giá bán')} Tỷ**")
+                    st.write(f"📐 Tầng: {row.get('Khoảng tầng')} | 🧭 Hướng: {row.get('Hướng BC')}")
+                    if is_admin: st.error(f"🔑 MÃ CĂN: {row.get('Mã căn')}")
+                    st.button("🔗 Gửi link cho khách")
+
+    with t2:
+        if is_admin:
+            with st.form("add"):
+                st.write("### Nhập căn hộ mới")
+                f1, f2 = st.columns(2)
+                with f1:
+                    ngay = st.date_input("Ngày")
+                    loai = st.selectbox("Loại", ["Studio", "1PN+", "2PN", "2PN+", "3N"])
+                    pk_n = st.selectbox("Phân khu", ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
+                    ma = st.text_input("Mã căn")
+                with f2:
+                    tg = st.selectbox("Tầng", ["Thấp", "Trung", "Cao"])
+                    gb = st.number_input("Giá (Tỷ)", step=0.1)
+                    anh = st.text_input("Link ảnh")
+                    tt = st.radio("Trạng thái", ["Đang bán", "Đã bán"], horizontal=True)
+                if st.form_submit_button("Lưu"):
+                    sheet_obj.append_row([str(ngay), loai, pk_n, ma, tg, "", "", gb, "", anh, tt])
+                    st.success("Đã thêm! Hãy tải lại trang.")
+        else:
+            st.warning("Nhập mật khẩu Admin để thêm hàng.")
