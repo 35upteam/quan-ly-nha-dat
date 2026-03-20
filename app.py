@@ -6,6 +6,10 @@ import requests, base64, time
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
+# --- DANH SÁCH CỐ ĐỊNH (THEO YÊU CẦU) ---
+LIST_PK = ["S", "GS", "SA", "VIC", "Sola", "Imper", "Tonkin", "Canopy", "Masteri", "Lumier"]
+LIST_LH = ["Studio", "1N", "1N+", "2N", "2N+", "3N"]
+
 # --- NHÃN CỘT ---
 L_DATE, L_LH, L_PK, L_MA = "Ngày lên hàng", "Loại hình", "Phân khu", "Mã căn"
 L_DT, L_TANG, L_NT, L_HBC = "Diện tích", "Khoảng tầng", "Nội thất", "Hướng BC"
@@ -13,7 +17,7 @@ L_GIA, L_HT, L_TT, L_IMG = "Giá bán", "Hiện trạng", "Trạng thái", "Link
 L_TYPE, L_GC = "Phân loại", "Ghi chú"
 V_SOLD, V_RENT = "Đã bán", "Đã thuê"
 
-# --- HÀM TRỢ GIÚP (QUAN TRỌNG: FIX LỖI NAMEERROR) ---
+# --- HÀM TRỢ GIÚP ---
 def up_img(fs):
     if not fs: return ""
     try:
@@ -22,11 +26,10 @@ def up_img(fs):
         for f in fs:
             f.seek(0); b6 = base64.b64encode(f.read()).decode('utf-8')
             r = requests.post("https://api.imgbb.com/1/upload", {"key": ak, "image": b6}, timeout=20)
-            if r.status_code == 200: res.append(r.json()['data']['url']) # Lấy link ảnh gốc
+            if r.status_code == 200: res.append(r.json()['data']['url'])
         return ",".join(res)
     except: return ""
 
-# --- HÀM XỬ LÝ CHUYỂN ẢNH (CALLBACK) ---
 def change_img(step, total):
     st.session_state.ci = (st.session_state.get('ci', 0) + step) % total
 
@@ -58,16 +61,12 @@ def show_dt(row, ks):
         imgs = str(row.get(L_IMG, "")).split(',') if row.get(L_IMG) else []
         if imgs and imgs[0]:
             if 'ci' not in st.session_state: st.session_state.ci = 0
-            total = len(imgs)
-            ix = st.session_state.ci % total
+            total = len(imgs); ix = st.session_state.ci % total
             st.image(imgs[ix], use_container_width=True, caption=f"Ảnh {ix+1}/{total}")
-            
             if total > 1:
                 b1, b2 = st.columns(2)
-                with b1:
-                    st.button("⬅️ Trước", key=f"p_{mid}", on_click=change_img, args=(-1, total))
-                with b2:
-                    st.button("Sau ➡️", key=f"n_{mid}", on_click=change_img, args=(1, total))
+                with b1: st.button("⬅️ Trước", key=f"p_{mid}", on_click=change_img, args=(-1, total))
+                with b2: st.button("Sau ➡️", key=f"n_{mid}", on_click=change_img, args=(1, total))
         else: st.info("Không có ảnh")
     with cl2:
         st.subheader(f"{row[L_LH]} - {row[L_PK]}")
@@ -77,7 +76,6 @@ def show_dt(row, ks):
         st.write(f"🧱 **Tầng:** {row[L_TANG]} | **Nội thất:** {row[L_NT]}")
         st.write(f"🚧 **Hiện trạng:** {row[L_HT]}")
         if row.get(L_GC): st.info(f"Ghi chú: {row[L_GC]}")
-        
         if is_adm:
             st.divider(); ck = f"ck_{mid}"
             if not st.session_state.get(ck, False):
@@ -116,8 +114,9 @@ if sh_obj is not None and not df_raw.empty:
     def draw(df_in, ks):
         df_a = df_in[~df_in[L_TT].astype(str).str.contains("Đã", na=False)]
         c1, c2, c3 = st.columns([3, 3, 4])
-        with c1: pk = st.multiselect("Phân khu", sorted(df_in[L_PK].unique()), key=f"p{ks}")
-        with c2: lh = st.multiselect("Loại hình", sorted(df_in[L_LH].unique()), key=f"l{ks}")
+        # CẬP NHẬT BỘ LỌC ĐẦY ĐỦ
+        with c1: pk = st.multiselect("Phân khu", LIST_PK, key=f"p{ks}")
+        with c2: lh = st.multiselect("Loại hình", LIST_LH, key=f"l{ks}")
         with c3:
             mi, ma = float(df_in[L_GIA].min()), float(df_in[L_GIA].max())
             r_gia = st.slider("Giá (Tỷ)", mi, ma, (mi, ma), key=f"g{ks}")
@@ -126,15 +125,13 @@ if sh_obj is not None and not df_raw.empty:
         if lh: df_a = df_a[df_a[L_LH].isin(lh)]
         df_a = df_a[(df_a[L_GIA] >= r_gia[0]) & (df_a[L_GIA] <= r_gia[1])]
         
-        # Dòng đếm số lượng (Chữ đen, thoáng)
         st.markdown(f"<div style='padding: 15px 0px; font-weight: bold; font-size: 17px;'>🔍 Đang hiển thị: {len(df_a)} căn hộ phù hợp</div>", unsafe_allow_html=True)
         
         v_cols = [L_DATE, L_LH, L_PK, L_DT, L_GIA, L_TT]
         if is_adm: v_cols.append(L_MA)
         sel = st.dataframe(df_a[v_cols], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row", key=f"df{ks}")
         if sel and sel.selection.rows:
-            st.session_state.ci = 0
-            show_dt(df_a.iloc[sel.selection.rows[0]], ks)
+            st.session_state.ci = 0; show_dt(df_a.iloc[sel.selection.rows[0]], ks)
 
     with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Bán|Ban", na=False)], "B")
     with t2: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Thuê|Thue", na=False)], "T")
@@ -144,10 +141,10 @@ if sh_obj is not None and not df_raw.empty:
                 tp = st.radio("Loại", ["Bán", "Cho thuê"], horizontal=True)
                 i1, i2, i3 = st.columns(3)
                 with i1:
-                    v_lh = st.selectbox(L_LH, ["Studio", "1PN+", "2PN", "2PN+", "3N"])
+                    v_lh = st.selectbox(L_LH, LIST_LH) # CẬP NHẬT FORM ĐĂNG
                     v_ma = st.text_input(L_MA)
                 with i2:
-                    v_pk = st.selectbox(L_PK, ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
+                    v_pk = st.selectbox(L_PK, LIST_PK) # CẬP NHẬT FORM ĐĂNG
                     v_dt = st.number_input(L_DT, 0.0)
                 with i3:
                     v_gi = st.number_input(L_GIA, step=0.1)
@@ -155,11 +152,11 @@ if sh_obj is not None and not df_raw.empty:
                 v_gc = st.text_input(L_GC); up = st.file_uploader("Ảnh", accept_multiple_files=True)
                 if st.form_submit_button("🚀 ĐĂNG CĂN"):
                     if v_ma:
-                        imgs = up_img(up) # Đã có hàm xử lý ở trên
+                        imgs = up_img(up)
                         try:
                             h = list(df_raw.columns); row_d = [""] * len(h)
                             dm = {L_TYPE:tp, L_DATE:str(pd.Timestamp.now().date()), L_LH:v_lh, L_PK:v_pk, L_MA:v_ma, L_DT:v_dt, L_GIA:v_gi, L_HT:v_ht, L_GC:v_gc, L_TT:"Đang bán", L_IMG:imgs}
                             for i, col in enumerate(h):
                                 if col in dm: row_d[i] = dm[col]
                             sh_obj.append_row(row_d); st.cache_resource.clear(); st.rerun()
-                        except: st.error("Lỗi kết nối Google Sheets")
+                        except: st.error("Lỗi Sheets")
