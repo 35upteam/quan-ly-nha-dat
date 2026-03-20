@@ -4,14 +4,14 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import requests, base64
 
-st.set_page_config(page_title="Vinhomes", layout="wide")
+st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
-# NHÃN CỘT
+# NHÃN CỘT chuẩn
 L_DATE, L_LH, L_PK, L_MA = "Ngày lên hàng", "Loại hình", "Phân khu", "Mã căn"
 L_DT, L_TANG, L_NT, L_HBC = "Diện tích", "Khoảng tầng", "Nội thất", "Hướng BC"
 L_GIA, L_HT, L_TT, L_IMG, L_TYPE, L_GC = "Giá bán", "Hiện trạng", "Trạng thái", "Link ảnh", "Phân loại", "Ghi chú"
 
-# BIẾN TRẠNG THÁI (Tránh viết tiếng Việt trực tiếp dài dòng)
+# TRẠNG THÁI
 T_DONE = "Đã"
 V_SOLD = f"{T_DONE} bán"
 V_RENT = f"{T_DONE} thuê"
@@ -39,32 +39,41 @@ def load_data():
         df['sheet_row'] = range(2, len(df) + 2)
         df[L_GIA] = pd.to_numeric(df[L_GIA], errors='coerce').fillna(0)
         return df.iloc[::-1].reset_index(drop=True), sh
-    except: return pd.DataFrame(), None
+    except Exception as e: return pd.DataFrame(), None
 
 df_raw, sh_obj = load_data()
 if 'is_login' not in st.session_state: st.session_state.is_login = False
 
-# --- HEADER & ADMIN ---
+# --- HEADER: Khôi phục icon và tiêu đề ---
 h1, h2 = st.columns([7, 3])
 with h1: st.title("🏢 Vinhomes Manager")
 with h2:
     if not st.session_state.is_login:
-        p = st.text_input("Pass", type="password", label_visibility="collapsed")
+        p = st.text_input("Mật khẩu truy cập", type="password", label_visibility="collapsed")
         if p == "admin123": st.session_state.is_login = True; st.rerun()
     else:
-        st.info("✅ Admin")
-        cb1, cb2 = st.columns(2)
-        with cb1:
-            if st.button("🔄"): st.cache_resource.clear(); st.rerun()
-        with cb2:
-            if st.button("❌"): st.session_state.is_login = False; st.rerun()
+        st.info("✅ Chế độ Admin")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("🔄 Làm mới"): st.cache_resource.clear(); st.rerun()
+        with c2:
+            if st.button("❌ Thoát"): st.session_state.is_login = False; st.rerun()
 
 is_adm = st.session_state.is_login
 if sh_obj is not None:
-    t1, t2, t3 = st.tabs(["🔴 Bán", "🟢 Thuê", "➕ Thêm"])
+    # Khôi phục tên Tab đầy đủ
+    t1, t2, t3 = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
+    
     def draw(df_in, ks):
-        # SỬA LỖI NGẮT DÒNG TẠI ĐÂY: Dùng biến T_DONE đã khai báo ở trên
         df_a = df_in[~df_in[L_TT].astype(str).str.contains(T_DONE, na=False)]
-        if df_a.empty: st.info("Trống"); return
-        st.write("### 🔍 Tìm nhanh")
-        s_ma = st
+        if df_a.empty: st.info("Hiện không có căn nào trống."); return
+        
+        st.markdown("### 🔍 Tìm kiếm & Lọc")
+        s_ma = st.text_input("Nhập mã căn để tìm nhanh...", key=f"sm{ks}").strip()
+        
+        c1, c2, c3 = st.columns([3, 3, 4])
+        with c1: pk = st.multiselect("Phân khu", sorted(df_in[L_PK].unique()), key=f"p{ks}")
+        with c2: lh = st.multiselect("Loại hình", sorted(df_in[L_LH].unique()), key=f"l{ks}")
+        with c3:
+            mi, ma = float(df_in[L_GIA].min()), float(df_in[L_GIA].max())
+            r_gia = st.slider("Khoảng giá (T
