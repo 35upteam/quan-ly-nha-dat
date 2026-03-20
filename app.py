@@ -11,6 +11,11 @@ L_DATE, L_LH, L_PK, L_MA = "Ngày lên hàng", "Loại hình", "Phân khu", "Mã
 L_DT, L_TANG, L_NT, L_HBC = "Diện tích", "Khoảng tầng", "Nội thất", "Hướng BC"
 L_GIA, L_HT, L_TT, L_IMG, L_TYPE, L_GC = "Giá bán", "Hiện trạng", "Trạng thái", "Link ảnh", "Phân loại", "Ghi chú"
 
+# BIẾN TRẠNG THÁI (Tránh viết tiếng Việt trực tiếp dài dòng)
+T_DONE = "Đã"
+V_SOLD = f"{T_DONE} bán"
+V_RENT = f"{T_DONE} thuê"
+
 def up_img(fs):
     if not fs: return ""
     try:
@@ -32,7 +37,6 @@ def load_data():
         if not r or len(r) < 1: return pd.DataFrame(), sh
         cols = [h.strip() for h in r[0]]; df = pd.DataFrame(r[1:], columns=cols)
         df['sheet_row'] = range(2, len(df) + 2)
-        # Viết gọn trên 1 dòng để tránh lỗi ngắt ngoặc
         df[L_GIA] = pd.to_numeric(df[L_GIA], errors='coerce').fillna(0)
         return df.iloc[::-1].reset_index(drop=True), sh
     except: return pd.DataFrame(), None
@@ -45,10 +49,10 @@ h1, h2 = st.columns([7, 3])
 with h1: st.title("🏢 Vinhomes Manager")
 with h2:
     if not st.session_state.is_login:
-        p = st.text_input("Mật khẩu", type="password", label_visibility="collapsed")
+        p = st.text_input("Pass", type="password", label_visibility="collapsed")
         if p == "admin123": st.session_state.is_login = True; st.rerun()
     else:
-        st.info("✅ Chế độ Admin")
+        st.info("✅ Admin")
         cb1, cb2 = st.columns(2)
         with cb1:
             if st.button("🔄"): st.cache_resource.clear(); st.rerun()
@@ -59,4 +63,8 @@ is_adm = st.session_state.is_login
 if sh_obj is not None:
     t1, t2, t3 = st.tabs(["🔴 Bán", "🟢 Thuê", "➕ Thêm"])
     def draw(df_in, ks):
-        df_a = df_in[~df_in[L_TT].astype(str).str.contains("Đ
+        # SỬA LỖI NGẮT DÒNG TẠI ĐÂY: Dùng biến T_DONE đã khai báo ở trên
+        df_a = df_in[~df_in[L_TT].astype(str).str.contains(T_DONE, na=False)]
+        if df_a.empty: st.info("Trống"); return
+        st.write("### 🔍 Tìm nhanh")
+        s_ma = st
