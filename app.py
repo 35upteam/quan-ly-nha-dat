@@ -27,23 +27,24 @@ def load_data():
 
 df_raw, sheet_obj = load_data()
 
-# --- GIAO DIỆN TRÊN CÙNG (ĐĂNG NHẬP & CẬP NHẬT) ---
-header_col1, header_col2, header_col3 = st.columns([2, 5, 2])
-
-with header_col1:
-    pw = st.text_input("🔑 Đăng nhập (Mật khẩu Admin)", type="password", label_visibility="collapsed", placeholder="Mật khẩu Admin...")
+# --- THANH LOGIN GỌN GÀNG GÓC PHẢI ---
+t_col1, t_col2 = st.columns([7, 3])
+with t_col2:
+    # Ô mật khẩu thu nhỏ
+    pw = st.text_input("Admin Login", type="password", label_visibility="collapsed", placeholder="Nhập pass để xem mã căn...")
     is_admin = (pw == "admin123")
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        if is_admin: st.success("Chào Admin")
+    with btn_col2:
+        if st.button("🔄 Làm mới"):
+            st.cache_resource.clear()
+            st.rerun()
 
-with header_col3:
-    if st.button("🔄 Cập nhật dữ liệu", use_container_width=True):
-        st.cache_resource.clear()
-        st.rerun()
-
-st.divider()
-
-# --- HỘP THOẠI HIỆN THÔNG TIN CĂN HỘ (DIALOG) ---
-@st.dialog("Chi tiết căn hộ", width="large")
+# --- HỘP THOẠI CHI TIẾT (BẢO MẬT MÃ CĂN) ---
+@st.dialog("Thông tin căn hộ", width="large")
 def show_details(row, admin_mode):
+    # Nội dung gửi khách (Không bao giờ có mã căn)
     copy_text = (
         f"🏢 CĂN HỘ VINHOMES SMART CITY\n"
         f"📍 Phân khu: {row.get('Phân khu')}\n"
@@ -52,97 +53,31 @@ def show_details(row, admin_mode):
         f"🧭 Hướng: {row.get('Hướng BC')}\n"
         f"🛋️ Nội thất: {row.get('Nội thất')}\n"
         f"💰 Giá bán: {row.get('Giá bán', 0):.2f} Tỷ\n"
-        f"📞 Liên hệ xem nhà ngay!"
+        f"📞 Liên hệ em để xem nhà trực tiếp!"
     )
     
     col_img, col_info = st.columns([1, 1])
     with col_img:
-        if row.get('Link ảnh'):
-            st.image(row['Link ảnh'], use_container_width=True)
-        else:
-            st.info("Căn hộ này chưa có ảnh thực tế.")
+        if row.get('Link ảnh'): st.image(row['Link ảnh'], use_container_width=True)
+        else: st.info("Hình ảnh đang được cập nhật...")
             
     with col_info:
         st.subheader(f"{row.get('Loại hình')} - {row.get('Phân khu')}")
-        st.write(f"📐 **Diện tích:** {row.get('Diện tích')} m2")
-        st.write(f"🧭 **Hướng:** {row.get('Hướng BC')} | 🛋️ **Nội thất:** {row.get('Nội thất')}")
+        st.write(f"📐 **Diện tích:** {row.get('Diện tích')} m2 | 🧭 **Hướng:** {row.get('Hướng BC')}")
+        st.write(f"🛋️ **Nội thất:** {row.get('Nội thất')}")
         st.markdown(f"### 💰 Giá: {row.get('Giá bán', 0):.2f} Tỷ")
-        
         st.write("---")
-        st.write("📋 **Nội dung gửi khách:**")
-        st.code(copy_text, language="text")
         
+        # PHẦN BẢO MẬT RIÊNG CHO ADMIN
         if admin_mode:
-            st.error(f"🔑 MÃ CĂN HỘ (BẢO MẬT): {row.get('Mã căn')}")
+            st.error(f"🔑 MÃ CĂN HỘ: {row.get('Mã căn')}")
+            st.caption("(Thông tin này chỉ hiển thị khi bạn đã đăng nhập)")
+        
+        st.write("📋 **Nội dung copy gửi khách:**")
+        st.code(copy_text, language="text")
 
-# --- GIAO DIỆN CHÍNH ---
+# --- TRANG CHÍNH ---
 st.title("🏢 Kho Hàng Vinhomes Smart City")
 
 if sheet_obj is not None:
-    tab_list, tab_add = st.tabs(["📋 Danh sách căn hộ", "➕ Thêm hàng mới"])
-    
-    with tab_list:
-        # Bộ lọc dàn hàng ngang
-        f1, f2, f3 = st.columns(3)
-        with f1: pk_f = st.multiselect("Lọc Phân khu", ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
-        with f2: lh_f = st.multiselect("Lọc Loại hình", ["Studio", "1PN+", "2PN", "2PN+", "3N"])
-        with f3: pr_f = st.slider("Lọc Giá (Tỷ)", 0.0, 15.0, (0.0, 15.0), step=0.1, format="%.1f")
-
-        df = df_raw.copy()
-        if pk_f: df = df[df['Phân khu'].isin(pk_f)]
-        if lh_f: df = df[df['Loại hình'].isin(lh_f)]
-        df = df[(df['Giá bán'] >= pr_f[0]) & (df['Giá bán'] <= pr_f[1])]
-
-        st.info(f"💡 Nhấn vào một dòng để xem ảnh và lấy nội dung copy (Tìm thấy {len(df)} căn)")
-        
-        # Bảng dữ liệu
-        sel = st.dataframe(
-            df, 
-            use_container_width=True, 
-            hide_index=True, 
-            on_select="rerun", 
-            selection_mode="single-row"
-        )
-
-        # Nếu chọn dòng, hiện Dialog
-        if sel and sel.selection.rows:
-            show_details(df.iloc[sel.selection.rows[0]], is_admin)
-
-    with tab_add:
-        if is_admin:
-            with st.form("form_add", clear_on_submit=True):
-                st.write("### 📝 Thêm căn hộ mới vào hệ thống")
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    n_ngay = st.date_input("Ngày lên hàng")
-                    n_loai = st.selectbox("Loại hình", ["Studio", "1PN+", "2PN", "2PN+", "3N"])
-                    n_pk = st.selectbox("Phân khu", ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
-                with c2:
-                    n_ma = st.text_input("Mã căn (Bảo mật)")
-                    n_dt = st.number_input("Diện tích (m2)", min_value=0.0, step=0.1)
-                    n_tg = st.selectbox("Khoảng tầng", ["Thấp", "Trung", "Cao"])
-                with c3:
-                    n_nt = st.selectbox("Nội thất", ["Nguyên bản", "Cơ bản", "Full đồ"])
-                    n_hbc = st.selectbox("Hướng ban công", ["Đông", "Tây", "Nam", "Bắc", "Đông Bắc", "Đông Nam", "Tây Bắc", "Tây Nam"])
-                    n_gia = st.number_input("Giá bán (Tỷ)", min_value=0.0, step=0.01)
-                
-                n_anh = st.text_input("Link ảnh căn hộ")
-                
-                if st.form_submit_button("🚀 Xác nhận lưu hàng"):
-                    try:
-                        h_list = sheet_obj.row_values(1)
-                        new_row = [""] * len(h_list)
-                        m = {
-                            "Ngày lên hàng": str(n_ngay), "Loại hình": n_loai, "Phân khu": n_pk, 
-                            "Mã căn": n_ma, "Diện tích": n_dt, "Khoảng tầng": n_tg, 
-                            "Nội thất": n_nt, "Hướng BC": n_hbc, "Giá bán": n_gia, 
-                            "Link ảnh": n_anh, "Trạng thái": "Đang bán"
-                        }
-                        for i, h in enumerate(h_list):
-                            if h.strip() in m: new_row[i] = m[h.strip()]
-                        sheet_obj.append_row(new_row)
-                        st.success("Đã thêm thành công! Nhấn 'Cập nhật' để làm mới bảng.")
-                        st.cache_resource.clear()
-                    except Exception as e: st.error(f"Lỗi: {e}")
-        else:
-            st.warning("🔒 Vui lòng nhập mật khẩu Admin ở góc trên bên trái để sử dụng tính năng này.")
+    tab_list, tab_add = st.tabs(["📋 Danh sách", "➕ Thêm
