@@ -5,14 +5,14 @@ import pandas as pd
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
-# --- ĐỊNH NGHĨA NHÃN NGẮN (Chống ngắt dòng) ---
+# --- ĐỊNH NGHĨA NHÃN ---
 L1, L2, L3 = "Phân khu", "Loại hình", "Mã căn"
 L4, L5, L6 = "Diện tích", "Khoảng tầng", "Nội thất"
 L7, L8, L9 = "Hướng BC", "Giá bán", "Link ảnh"
 
 PK_L = ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"]
 LH_L = ["Studio", "1PN+", "2PN", "2PN+", "3N"]
-H_L = ["Đông", "Tây", "Nam", "Bắc", "Đông Bắc", "Đông Nam", "Tây Bắc", "Tây Nam"]
+H_L = ["Đông", "Tây", "Nam", "Bắc", "ĐB", "ĐN", "TB", "TN"]
 NT_L = ["Nguyên bản", "Cơ bản", "Full đồ"]
 TG_L = ["Thấp", "Trung", "Cao"]
 
@@ -82,16 +82,3 @@ def show_dt(row, adm):
 
 st.title("🏢 Kho Hàng Vinhomes")
 if sh_obj is not None:
-    t1, t2 = st.tabs(["📋 Danh sách", "➕ Thêm hàng"])
-    with t1:
-        c1, c2, c3 = st.columns(3)
-        with c1: pk = st.multiselect(L1, PK_L)
-        with c2: lh = st.multiselect(L2, LH_L)
-        with c3: pr = st.slider(L8, 0.0, 15.0, (0.0, 15.0), 0.1)
-        df = df_raw.copy()
-        if pk: df = df[df[L1].isin(pk)]
-        if lh: df = df[df[L2].isin(lh)]
-        df = df[(df[L8] >= pr[0]) & (df[L8] <= pr[1])]
-        d_df = df.drop(columns=[L3]) if L3 in df.columns else df
-        st.write(f"Tìm thấy {len(df)} căn")
-        sel = st.dataframe(d_df, use_container_width=True, hide_index=True, on_select="rerun", selection
