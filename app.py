@@ -45,7 +45,7 @@ df_raw, sh_obj = load_data()
 if 'is_login' not in st.session_state: st.session_state.is_login = False
 is_adm = st.session_state.is_login
 
-# --- DIALOG CHI TIẾT ---
+# --- DIALOG CHI TIẾT (ĐÃ ĐƯA RA NGOÀI HÀM DRAW ĐỂ HẾT LỖI ID) ---
 @st.dialog("Chi tiết căn hộ")
 def show_dt(row, ks):
     mid = str(row.get(L_MA, "0"))
@@ -92,16 +92,13 @@ def show_dt(row, ks):
                         st.session_state[ck] = False; st.rerun()
         st.code(f"Mã: {mid if is_adm else 'Ẩn'}")
 
-# --- GIAO DIỆN CHÍNH (KHÔI PHỤC HEADER CŨ) ---
+# --- GIAO DIỆN CHÍNH ---
 h1, h2 = st.columns([7, 3])
-with h1: 
-    st.title("🏢 Vinhomes Manager")
+with h1: st.title("🏢 Vinhomes Manager")
 with h2:
     if not is_adm:
-        # Ô nhập pass nằm gọn bên phải header
         p = st.text_input("Admin", type="password", label_visibility="collapsed")
-        if p == "admin123": 
-            st.session_state.is_login = True; st.rerun()
+        if p == "admin123": st.session_state.is_login = True; st.rerun()
     else:
         st.info("✅ Admin")
         ca1, ca2 = st.columns(2)
@@ -110,7 +107,6 @@ with h2:
         with ca2:
             if st.button("Out"): st.session_state.is_login = False; st.rerun()
 
-# --- PHẦN TABS VÀ DANH SÁCH ---
 if sh_obj is not None and not df_raw.empty:
     t1, t2, t3 = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
     
