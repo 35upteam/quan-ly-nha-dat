@@ -79,7 +79,6 @@ def show_details(row, admin_mode):
 # --- TRANG CHÍNH ---
 st.title("🏢 Kho Hàng Vinhomes Smart City")
 if sheet_obj is not None:
-    # Chia nhỏ danh sách tab để tránh lỗi Syntax
     tab_names = ["📋 Danh sách", "➕ Thêm hàng"]
     tab_list, tab_add = st.tabs(tab_names)
     
@@ -118,12 +117,5 @@ if sheet_obj is not None:
                 c1, c2, c3 = st.columns(3)
                 with c1:
                     n_ngay = st.date_input("Ngày")
-                    n_loai = st.selectbox("Loại hình", lhs)
-                    n_pk = st.selectbox("Phân khu", pks)
-                with c2:
-                    n_ma = st.text_input("Mã căn")
-                    n_dt = st.number_input("Diện tích (m2)", 0.0, step=0.1)
-                    n_tg = st.selectbox("Tầng", ["Thấp", "Trung", "Cao"])
-                with c3:
-                    nts = ["Nguyên bản", "Cơ bản", "Full đồ"]
-                    hbc_l = ["Đông", "Tây", "Nam", "Bắc", "ĐB", "ĐN", "TB", "TN"]
+                    n_loai = st.selectbox("Loại hình", ["Studio", "1PN+", "2PN", "2PN+", "3N"])
+                    n_pk = st.selectbox("Phân khu", ["S", "
