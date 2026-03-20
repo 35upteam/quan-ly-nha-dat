@@ -109,6 +109,8 @@ with head_c2:
                 else:
                     st.toast("Sai mật khẩu!", icon="❌")
     else:
+        # THÊM CÂU CHÀO Ở ĐÂY
+        st.markdown("<p style='margin-bottom: -10px; text-align: right; font-weight: bold; color: #1f77b4;'>👋 Xin chào, Admin Ninh!</p>", unsafe_allow_html=True)
         ca1, ca2 = st.columns([1, 1], vertical_alignment="center")
         with ca1:
             if st.button("🔄 Làm mới", key="btn_ref", use_container_width=True): 
@@ -123,57 +125,4 @@ if sh_obj is not None and not df_raw.empty:
     
     def draw(df_in, ks):
         df_a = df_in[~df_in[L_TT].astype(str).str.contains("Đã", na=False)]
-        c1, c2, c3 = st.columns([3, 3, 4])
-        # ĐÃ CẬP NHẬT placeholder="Lựa chọn" CHO BỘ LỌC
-        with c1: pk = st.multiselect("Phân khu", LIST_PK, placeholder="Lựa chọn", key=f"p{ks}")
-        with c2: lh = st.multiselect("Loại hình", LIST_LH, placeholder="Lựa chọn", key=f"l{ks}")
-        with c3:
-            mi, ma = float(df_in[L_GIA].min()), float(df_in[L_GIA].max())
-            r_gia = st.slider("Giá (Tỷ)", mi, ma, (mi, ma), key=f"g{ks}")
-        
-        if pk: df_a = df_a[df_a[L_PK].isin(pk)]
-        if lh: df_a = df_a[df_a[L_LH].isin(lh)]
-        df_a = df_a[(df_a[L_GIA] >= r_gia[0]) & (df_a[L_GIA] <= r_gia[1])]
-        
-        st.markdown(f"<div style='padding: 15px 0px; font-weight: bold; font-size: 17px;'>🔍 Đang hiển thị: {len(df_a)} căn hộ phù hợp</div>", unsafe_allow_html=True)
-        
-        v_cols = [L_DATE, L_LH, L_PK, L_DT, L_GIA, L_TT]
-        if is_adm: v_cols.append(L_MA)
-        sel = st.dataframe(df_a[v_cols], use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row", key=f"df{ks}")
-        if sel and sel.selection.rows:
-            st.session_state.ci = 0; show_dt(df_a.iloc[sel.selection.rows[0]], ks)
-
-    with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Bán|Ban", na=False)], "B")
-    with t2: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Thuê|Thue", na=False)], "T")
-    with t3:
-        if is_adm:
-            with st.form("f_add", clear_on_submit=True):
-                tp = st.radio("Loại", ["Bán", "Cho thuê"], horizontal=True)
-                i1, i2, i3 = st.columns(3)
-                with i1:
-                    v_lh = st.selectbox(L_LH, LIST_LH, placeholder="Lựa chọn")
-                    v_ma = st.text_input(L_MA)
-                with i2:
-                    v_pk = st.selectbox(L_PK, LIST_PK, placeholder="Lựa chọn")
-                    v_dt = st.number_input(L_DT, 0.0)
-                with i3:
-                    v_gi = st.number_input(L_GIA, step=0.1)
-                    v_ht = st.selectbox(L_HT, ["Đang ở", "Để trống", "Cho thuê"])
-                v_gc = st.text_input(L_GC); up = st.file_uploader("Ảnh", accept_multiple_files=True)
-                if st.form_submit_button("🚀 ĐĂNG CĂN"):
-                    if v_ma:
-                        imgs = up_img(up)
-                        try:
-                            h = list(df_raw.columns); row_d = [""] * len(h)
-                            dm = {L_TYPE:tp, L_DATE:str(pd.Timestamp.now().date()), L_LH:v_lh, L_PK:v_pk, L_MA:v_ma, L_DT:v_dt, L_GIA:v_gi, L_HT:v_ht, L_GC:v_gc, L_TT:"Đang bán", L_IMG:imgs}
-                            for i, col in enumerate(h):
-                                if col in dm: row_d[i] = dm[col]
-                            sh_obj.append_row(row_d); st.cache_resource.clear(); st.rerun()
-                        except: st.error("Lỗi Sheets")
-        else:
-            st.warning("### 🔐 Khu vực dành cho quản trị viên")
-            st.info("""
-            Chào bạn, chức năng **Thêm hàng** chỉ dành cho tài khoản Admin.
-            **Để cộng tác hoặc ký gửi nguồn hàng, vui lòng:**
-            * Liên hệ trực tiếp: **0912.791.925 (Mr. Ninh)**
-            """)
+        c1, c2, c3 = st.columns([3,
