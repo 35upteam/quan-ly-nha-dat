@@ -93,14 +93,17 @@ def show_dt(row, ks):
                         st.session_state[ck] = False; st.rerun()
         st.code(f"Mã: {mid if is_adm else 'Ẩn'}")
 
-# --- GIAO DIỆN CHÍNH ---
-h1, h2 = st.columns([7, 3]) # Chỉnh tỷ lệ để tiêu đề dài ra, thanh đăng nhập nhỏ lại
-with h1: 
-    st.markdown("### 🏢 Nguồn hàng Vinhomes Smart City - Mr. Ninh - 0912.791.925")
+# --- GIAO DIỆN CHÍNH (HEADER INLINE) ---
+# Chia làm 2 cột lớn: Cột 1 chứa tiêu đề, Cột 2 chứa cụm đăng nhập
+head_c1, head_c2 = st.columns([6, 4], vertical_alignment="center")
 
-with h2:
+with head_c1:
+    st.markdown("<h4 style='margin:0; padding:0;'>🏢 Nguồn hàng Vinhomes Smart City - Mr. Ninh - 0912.791.925</h4>", unsafe_allow_html=True)
+
+with head_c2:
     if not is_adm:
-        c_in, c_bt = st.columns([2, 1]) # Làm thanh nhập pass nhỏ hơn nữa
+        # Chia nhỏ cột 2 để pass và nút nằm ngang
+        c_in, c_bt = st.columns([2.5, 1.5], vertical_alignment="center")
         with c_in:
             p = st.text_input("", type="password", placeholder="Password...", label_visibility="collapsed", key="login_pass")
         with c_bt:
@@ -110,13 +113,15 @@ with h2:
                 else:
                     st.toast("Sai mật khẩu!", icon="❌")
     else:
-        ca1, ca2 = st.columns(2)
+        ca1, ca2 = st.columns([1, 1], vertical_alignment="center")
         with ca1:
             if st.button("🔄 Làm mới", key="btn_ref", use_container_width=True): 
                 st.cache_resource.clear(); st.rerun()
         with ca2:
             if st.button("🔒 Thoát", key="btn_out", use_container_width=True, type="primary"): 
                 st.session_state.is_login = False; st.rerun()
+
+st.divider() # Ngăn cách header với nội dung bên dưới
 
 if sh_obj is not None and not df_raw.empty:
     t1, t2, t3 = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
@@ -170,12 +175,9 @@ if sh_obj is not None and not df_raw.empty:
                             sh_obj.append_row(row_d); st.cache_resource.clear(); st.rerun()
                         except: st.error("Lỗi Sheets")
         else:
-            # Thông báo Tab Thêm hàng dành cho CTV (Đã bỏ nút quay lại)
             st.warning("### 🔐 Khu vực dành cho quản trị viên")
             st.info("""
             Chào bạn, chức năng **Thêm hàng** chỉ dành cho tài khoản Admin.
-            
             **Để cộng tác hoặc ký gửi nguồn hàng, vui lòng:**
             * Liên hệ trực tiếp: **0912.791.925 (Mr. Ninh)**
-            * Nhập mật khẩu Admin ở thanh đăng nhập phía trên.
             """)
