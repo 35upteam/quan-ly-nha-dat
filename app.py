@@ -18,8 +18,10 @@ def load_data():
         if not raw or len(raw) < 1: return pd.DataFrame(), sh
         cols = [str(h).strip() for h in raw[0]]
         df = pd.DataFrame(raw[1:], columns=cols)
+        # Chuyển đổi giá sang số để lọc
         if "Giá bán" in df.columns:
             df["Giá bán"] = pd.to_numeric(df["Giá bán"], errors='coerce').fillna(0)
+        # Mới nhất lên đầu
         return df.iloc[::-1].reset_index(drop=True), sh
     except Exception as e:
         st.error(f"Lỗi: {e}")
@@ -49,30 +51,22 @@ if sheet_obj is not None:
         with c3: 
             pr_f = st.slider("Giá (Tỷ)", 0.0, 10.0, (0.0, 10.0), step=0.001, format="%.3f")
 
-        df = df_raw.copy()
-        if pk_f: df = df[df['Phân khu'].isin(pk_f)]
-        if lh_f: df = df[df['Loại hình'].isin(lh_f)]
-        if 'Giá bán' in df.columns:
-            df = df[(df['Giá bán'] >= pr_f[0]) & (df['Giá bán'] <= pr_f[1])]
+        if not df_raw.empty:
+            df = df_raw.copy()
+            # LOGIC LỌC MỚI: Nếu không chọn gì thì hiện tất cả
+            if pk_f: df = df[df['Phân khu'].isin(pk_f)]
+            if lh_f: df = df[df['Loại hình'].isin(lh_f)]
+            if 'Giá bán' in df.columns:
+                df = df[(df['Giá bán'] >= pr_f[0]) & (df['Giá bán'] <= pr_f[1])]
 
-        v_df = df.copy()
-        if not is_admin and 'Mã căn' in v_df.columns: v_df = v_df.drop(columns=['Mã căn'])
-        st.write(f"🔍 Tìm thấy **{len(v_df)}** căn")
-        sel = st.dataframe(v_df, use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row")
-
-        if sel and sel.selection.rows:
-            row = df.iloc[sel.selection.rows[0]]
-            st.divider()
-            ca, cb = st.columns(2)
-            with ca:
-                if row.get('Link ảnh'): st.image(row['Link ảnh'], use_container_width=True)
-                else: st.info("Chưa có ảnh")
-            with cb:
-                st.subheader(f"{row.get('Loại hình')} - {row.get('Phân khu')}")
-                st.markdown(f"💰 Giá: **{row.get('Giá bán',0):.3f} Tỷ**")
-                st.write(f"📐 Tầng: {row.get('Khoảng tầng')} | 🧭 Hướng: {row.get('Hướng BC')}")
-                st.write(f"🛋️ Nội thất: {row.get('Nội thất')}")
-                if is_admin: st.error(f"🔑 MÃ: {row.get('Mã căn')}")
+            v_df = df.copy()
+            if not is_admin and 'Mã căn' in v_df.columns: 
+                v_df = v_df.drop(columns=['Mã căn'])
+            
+            st.write(f"🔍 Tìm thấy **{len(v_df)}** căn")
+            st.dataframe(v_df, use_container_width=True, hide_index=True)
+        else:
+            st.warning("Hiện tại Google Sheet của bạn đang trống.")
 
     with t2:
         if is_admin:
@@ -98,7 +92,7 @@ if sheet_obj is not None:
                         for i, h in enumerate(h_list):
                             if h.strip() in m: new_row[i] = m[h.strip()]
                         sheet_obj.append_row(new_row)
-                        st.success("Đã lưu thành công!")
+                        st.success("Đã lưu! Hãy nhấn 'Cập nhật danh sách' bên trái.")
                         st.cache_resource.clear()
                     except Exception as e: st.error(f"Lỗi: {e}")
         else:
