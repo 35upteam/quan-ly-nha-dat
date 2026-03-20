@@ -6,7 +6,7 @@ import requests, base64
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
-# KHAI BÁO NHÃN (Tách nhỏ để không bị ngắt dòng)
+# KHAI BÁO NHÃN
 L_DATE = "Ngày" + " lên" + " hàng"
 L_LH = "Loại" + " hình"
 L_PK = "Phân" + " khu"
@@ -52,16 +52,15 @@ def load_data():
 
 df_raw, sh_obj = load_data()
 if 'is_login' not in st.session_state: st.session_state.is_login = False
+is_adm = st.session_state.is_login
 
-# --- HEADER CHUẨN ---
+# --- HEADER ---
 h1, h2 = st.columns([7, 3])
 with h1: st.title("🏢 Vinhomes Manager")
 with h2:
-    if not st.session_state.is_login:
-        p = st.text_input("Mật khẩu", type="password", label_visibility="collapsed")
-        if p == "admin123":
-            st.session_state.is_login = True
-            st.rerun()
+    if not is_adm:
+        p = st.text_input("Admin", type="password", label_visibility="collapsed")
+        if p == "admin123": st.session_state.is_login = True; st.rerun()
     else:
         st.info("✅ Admin Mode")
         ca1, ca2 = st.columns(2)
@@ -70,7 +69,6 @@ with h2:
         with ca2:
             if st.button("❌ Out"): st.session_state.is_login = False; st.rerun()
 
-is_adm = st.session_state.is_login
 if sh_obj is not None and not df_raw.empty:
     t1, t2, t3 = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
     
@@ -79,9 +77,12 @@ if sh_obj is not None and not df_raw.empty:
         if df_a.empty: st.info("Trống."); return
         
         st.markdown("### 🔍 Tìm & Lọc")
-        s_ma = st.text_input("Mã căn...", key=f"s{ks}").strip()
         
-        # QUAY LẠI GIAO DIỆN HÀNG NGANG
+        # CHỈ HIỆN TÌM MÃ CĂN NẾU LÀ ADMIN
+        s_ma = ""
+        if is_adm:
+            s_ma = st.text_input("Tìm Mã căn (Chỉ Admin)...", key=f"s{ks}").strip()
+        
         c1, c2, c3 = st.columns([3, 3, 4])
         with c1: pk = st.multiselect("Phân khu", sorted(df_in[L_PK].unique()), key=f"p{ks}")
         with c2: lh = st.multiselect("Loại hình", sorted(df_in[L_LH].unique()), key=f"l{ks}")
@@ -89,7 +90,8 @@ if sh_obj is not None and not df_raw.empty:
             mi, ma = float(df_in[L_GIA].min()), float(df_in[L_GIA].max())
             r_gia = st.slider("Giá (Tỷ)", mi, ma, (mi, ma), key=f"g{ks}")
         
-        if s_ma: df_a = df_a[df_a[L_MA].astype(str).str.contains(s_ma, case=False, na=False)]
+        if is_adm and s_ma: 
+            df_a = df_a[df_a[L_MA].astype(str).str.contains(s_ma, case=False, na=False)]
         if pk: df_a = df_a[df_a[L_PK].isin(pk)]
         if lh: df_a = df_a[df_a[L_LH].isin(lh)]
         df_a = df_a[(df_a[L_GIA] >= r_gia[0]) & (df_a[L_GIA] <= r_gia[1])]
@@ -118,24 +120,28 @@ if sh_obj is not None and not df_raw.empty:
             with cl2:
                 st.subheader(f"{row[L_LH]} - {row[L_PK]}")
                 st.success(f"Giá: {row[L_GIA]} Tỷ")
+                
+                # KHÔI PHỤC CHỨC NĂNG CHỐT CĂN CHO ADMIN
                 if is_adm:
                     st.divider(); ck = f"ck_{mid}"
                     if ck not in st.session_state: st.session_state[ck] = False
                     if not st.session_state[ck]:
-                        if st.button("✅ CHỐT CĂN", use_container_width=True, type="primary", key=f"bt_{mid}"): 
+                        if st.button("✅ CHỐT CĂN NÀY", use_container_width=True, type="primary", key=f"bt_{mid}"): 
                             st.session_state[ck] = True; st.rerun()
                     else:
-                        st.warning("Xác nhận?"); cy, cn = st.columns(2)
+                        st.warning("Xác nhận đã bán/thuê?"); cy, cn = st.columns(2)
                         with cy:
-                            if st.button("OK", type="primary", key=f"y_{mid}"):
+                            if st.button("OK", type="primary", use_container_width=True, key=f"ok_{mid}"):
                                 try:
                                     h = [x.strip() for x in sh_obj.row_values(1)]; idx = h.index(L_TT) + 1
                                     sh_obj.update_cell(int(row['sheet_row']), idx, V_SOLD if ks=="B" else V_RENT)
                                     st.session_state[ck] = False; st.cache_resource.clear(); st.rerun()
-                                except: st.error("Lỗi")
+                                except: st.error("Lỗi cập nhật")
                         with cn:
-                            if st.button("Hủy", key=f"n_{mid}"): st.session_state[ck]=False; st.rerun()
-                st.code(f"Mã: {mid}\nGhi chú: {row.get(L_GC, '')}")
+                            if st.button("Hủy", use_container_width=True, key=f"no_{mid}"): st.session_state[ck]=False; st.rerun()
+                
+                st.code(f"Mã: {mid if is_adm else 'Ẩn'}\nGhi chú: {row.get(L_GC, '')}")
+        
         if sel and sel.selection.rows: st.session_state.ci = 0; show_dt(df_a.iloc[sel.selection.rows[0]])
 
     with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Bán|Ban|bán|ban", na=False)], "B")
