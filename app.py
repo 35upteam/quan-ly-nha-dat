@@ -12,7 +12,7 @@ L_TYPE = "Phân loại"
 L1, L2, L3 = "Phân khu", "Loại hình", "Mã căn"
 L4, L5, L6 = "Diện tích", "Khoảng tầng", "Nội thất"
 L7, L8, L9 = "Hướng BC", "Giá bán", "Link ảnh"
-L10, L11 = "Hiện trạng", "Ghi chú"
+L10, L11, L12 = "Hiện trạng", "Ghi chú", "Trạng thái"
 
 PK_L = ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"]
 LH_L = ["Studio", "1PN+", "2PN", "2PN+", "3N"]
@@ -49,6 +49,7 @@ def load_data():
         r = sh.get_all_values()
         if not r or len(r) < 1: return pd.DataFrame(), sh
         df = pd.DataFrame(r[1:], columns=[h.strip() for h in r[0]])
+        if L12 not in df.columns: df[L12] = "Đang bán"
         return df.iloc[::-1].reset_index(drop=True), sh
     except: return pd.DataFrame(), None
 
@@ -77,7 +78,23 @@ with h2:
 
 is_adm = st.session_state.is_login
 
-# --- CỬA SỔ CHI TIẾT (SỬA LỖI DUPLICATE ID) ---
+# --- HÀM CẬP NHẬT TRẠNG THÁI ---
+def update_status(row_data):
+    try:
+        headers = [h.strip() for h in sh_obj.row_values(1)]
+        col_idx = headers.index(L12) + 1
+        all_ma_can = sh_obj.col_values(headers.index(L3) + 1)
+        row_idx = all_ma_can.index(row_data[L3]) + 1
+        
+        new_st = "Đã bán" if row_data[L_TYPE] == "Bán" else "Đã cho thuê"
+        sh_obj.update_cell(row_idx, col_idx, new_st)
+        st.success(f"🎉 Đã chốt căn {row_data[L3]}!")
+        st.cache_resource.clear()
+        st.rerun()
+    except Exception as e:
+        st.error(f"Lỗi khi cập nhật: {e}")
+
+# --- CỬA SỔ CHI TIẾT ---
 @st.dialog("📋 Chi tiết")
 def show_dt(row, adm):
     c1, c2 = st.columns([1.2, 1])
@@ -102,7 +119,28 @@ def show_dt(row, adm):
         st.success(f"💰 Giá: {row.get(L8)}")
         st.info(f"📍 Hiện trạng: {row.get(L10, 'N/A')}")
         if row.get(L11): st.write(f"📝 {row[L11]}")
-        if adm: st.error(f"🔑 {L3}: {row.get(L3)}")
+        if adm: 
+            st.error(f"🔑 {L3}: {row.get(L3)}")
+            st.divider()
+            # CƠ CHẾ XÁC NHẬN 2 BƯỚC
+            if f"confirm_{row[L3]}" not in st.session_state:
+                st.session_state[f"confirm_{row[L3]}"] = False
+            
+            if not st.session_state[f"confirm_{row[L3]}"]:
+                if st.button("✅ ĐÃ CHỐT CĂN NÀY", use_container_width=True, type="primary"):
+                    st.session_state[f"confirm_{row[L3]}"] = True
+                    st.rerun()
+            else:
+                st.warning("⚠️ Bạn chắc chắn muốn chốt căn này chứ?")
+                col_y, col_n = st.columns(2)
+                with col_y:
+                    if st.button("Xác nhận", use_container_width=True, type="primary"):
+                        update_status(row)
+                        st.session_state[f"confirm_{row[L3]}"] = False
+                with col_n:
+                    if st.button("Hủy", use_container_width=True):
+                        st.session_state[f"confirm_{row[L3]}"] = False
+                        st.rerun()
         st.divider()
         st.code(f"🏢 VINHOMES\n📍 {row.get(L1)}\n✨ {row.get(L2)}\n💰 {row.get(L8)}\n🏠 {row.get(L10)}")
 
@@ -111,7 +149,8 @@ if sh_obj is not None:
     t_ban, t_thue, t_add = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
     
     def draw_list(df_filter, key_s):
-        if df_filter.empty:
+        df_display = df_filter[~df_filter[L12].isin(["Đã bán", "Đã cho thuê"])]
+        if df_display.empty:
             st.info("Hiện chưa có căn nào.")
             return
 
@@ -119,55 +158,12 @@ if sh_obj is not None:
         with f1: pk = st.multiselect(f"{L1}", PK_L, key=f"pk_{key_s}")
         with f2: lh = st.multiselect(f"{L2}", LH_L, key=f"lh_{key_s}")
         
-        if pk: df_filter = df_filter[df_filter[L1].isin(pk)]
-        if lh: df_filter = df_filter[df_filter[L2].isin(lh)]
+        if pk: df_display = df_display[df_display[L1].isin(pk)]
+        if lh: df_display = df_display[df_display[L2].isin(lh)]
         
-        cols_drop = [L9, L_TYPE]
+        cols_drop = [L9, L_TYPE, L12]
         if not is_adm: cols_drop.append(L3)
-        display_df = df_filter.drop(columns=[c for c in cols_drop if c in df_filter.columns], errors='ignore')
+        final_df = df_display.drop(columns=[c for c in cols_drop if c in df_display.columns], errors='ignore')
         
-        st.write(f"Tìm thấy {len(df_filter)} căn")
-        sel = st.dataframe(display_df, use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row", key=f"df_{key_s}")
-        
-        if sel and sel.selection.rows:
-            st.session_state.curr_img = 0
-            show_dt(df_filter.iloc[sel.selection.rows[0]], is_adm)
-
-    with t_ban:
-        df_b = df_raw[df_raw[L_TYPE] == "Bán"] if (not df_raw.empty and L_TYPE in df_raw.columns) else df_raw
-        draw_list(df_b, "ban")
-
-    with t_thue:
-        df_t = df_raw[df_raw[L_TYPE] == "Cho thuê"] if (not df_raw.empty and L_TYPE in df_raw.columns) else pd.DataFrame()
-        draw_list(df_t, "thue")
-
-    with t_add:
-        if is_adm:
-            with st.form("form_v18_3", clear_on_submit=True):
-                v_type = st.radio("Loại hình:", ["Bán", "Cho thuê"], horizontal=True)
-                i1, i2, i3 = st.columns(3)
-                with i1:
-                    v_ng = st.date_input("Ngày"); v_lh = st.selectbox(L2, LH_L); v_pk = st.selectbox(L1, PK_L)
-                with i2:
-                    v_ma = st.text_input(L3); v_dt = st.number_input(L4, 0.0); v_tg = st.selectbox(L5, TG_L)
-                with i3:
-                    v_nt = st.selectbox(L6, NT_L); v_hb = st.selectbox(L7, H_L); v_gi = st.text_input(L8)
-                
-                c1, c2 = st.columns([1, 2])
-                with c1: v_ht = st.selectbox(L10, HT_L)
-                with c2: v_gc = st.text_input(L11)
-                
-                f_up = st.file_uploader("📸 Ảnh", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
-                
-                if st.form_submit_button("🚀 Lưu"):
-                    imgs = upload_multiple_imgs(f_up) if f_up else ""
-                    try:
-                        cols = [c.strip() for c in sh_obj.row_values(1)]
-                        new_row = [""] * len(cols)
-                        data_m = {L_TYPE: v_type, "Ngày lên hàng": str(v_ng), L2: v_lh, L1: v_pk, L3: v_ma, L4: v_dt, L5: v_tg, L6: v_nt, L7: v_hb, L8: v_gi, L9: imgs, L10: v_ht, L11: v_gc, "Trạng thái": "Đang bán"}
-                        for idx, col in enumerate(cols):
-                            if col in data_m: new_row[idx] = data_m[col]
-                        sh_obj.append_row(new_row)
-                        st.success("✅ Đã lưu!"); st.cache_resource.clear(); st.rerun()
-                    except Exception as e: st.error(f"Lỗi: {e}")
-        else: st.warning("Cần Pass Admin")
+        st.write(f"Tìm thấy {len(df_display)} căn")
+        sel = st.dataframe(final_df, use_container_width=True, hide_index=True, on_select="rer
