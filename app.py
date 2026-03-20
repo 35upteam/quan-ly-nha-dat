@@ -103,26 +103,4 @@ with head_c2:
         with c_in:
             p = st.text_input("", type="password", placeholder="Password...", label_visibility="collapsed", key="login_pass")
         with c_bt:
-            if st.button("Đăng nhập", use_container_width=True):
-                if p == "admin123":
-                    st.session_state.is_login = True; st.rerun()
-                else:
-                    st.toast("Sai mật khẩu!", icon="❌")
-    else:
-        # THÊM CÂU CHÀO Ở ĐÂY
-        st.markdown("<p style='margin-bottom: -10px; text-align: right; font-weight: bold; color: #1f77b4;'>👋 Xin chào, Admin Ninh!</p>", unsafe_allow_html=True)
-        ca1, ca2 = st.columns([1, 1], vertical_alignment="center")
-        with ca1:
-            if st.button("🔄 Làm mới", key="btn_ref", use_container_width=True): 
-                st.cache_resource.clear(); st.rerun()
-        with ca2:
-            if st.button("🔒 Thoát", key="btn_out", use_container_width=True, type="primary"): 
-                st.session_state.is_login = False; st.rerun()
-st.divider()
-
-if sh_obj is not None and not df_raw.empty:
-    t1, t2, t3 = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
-    
-    def draw(df_in, ks):
-        df_a = df_in[~df_in[L_TT].astype(str).str.contains("Đã", na=False)]
-        c1, c2, c3 = st.columns([3,
+            if st.button
