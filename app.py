@@ -2,15 +2,12 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
-import requests
-import base64
+import requests, base64
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
-# --- BIẾN ĐỊNH DANH ---
 L_TYPE, L1, L2, L3 = "Phân loại", "Phân khu", "Loại hình", "Mã căn"
-L4, L5, L6 = "Diện tích", "Khoảng tầng", "Nội thất"
-L7, L8, L9 = "Hướng BC", "Giá bán", "Link ảnh"
+L4, L5, L6, L7, L8, L9 = "Diện tích", "Khoảng tầng", "Nội thất", "Hướng BC", "Giá bán", "Link ảnh"
 L10, L11, L12 = "Hiện trạng", "Ghi chú", "Trạng thái"
 
 PK_L = ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"]
@@ -20,30 +17,24 @@ NT_L = ["Nguyên bản", "Cơ bản", "Full đồ"]
 TG_L = ["Thấp", "Trung", "Cao"]
 HT_L = ["Đang ở", "Đang cho thuê", "Để trống"]
 
-def upload_multiple_imgs(files):
-    if not files: return ""
+def up_img(fs):
+    if not fs: return ""
     try:
-        api_key = st.secrets.get("imgbb_api_key") or st.secrets.get("gcp_service_account", {}).get("imgbb_api_key")
-        if not api_key: return ""
-        urls = []
-        for f in files:
-            f.seek(0)
-            img_64 = base64.b64encode(f.read()).decode('utf-8')
-            res = requests.post("https://api.imgbb.com/1/upload", {"key": api_key, "image": img_64}, timeout=20)
-            if res.status_code == 200: urls.append(res.json()['data']['thumb']['url']) 
-        return ",".join(urls)
+        ak = st.secrets.get("imgbb_api_key") or st.secrets.get("gcp_service_account", {}).get("imgbb_api_key")
+        res_ls = []
+        for f in fs:
+            f.seek(0); b6 = base64.b64encode(f.read()).decode('utf-8')
+            r = requests.post("https://api.imgbb.com/1/upload", {"key": ak, "image": b6}, timeout=20)
+            if r.status_code == 200: res_ls.append(r.json()['data']['thumb']['url']) 
+        return ",".join(res_ls)
     except: return ""
 
 @st.cache_resource
 def load_data():
     try:
-        s = st.secrets["gcp_service_account"]
-        sc = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        c = ServiceAccountCredentials.from_json_keyfile_dict(s, sc)
-        g = gspread.authorize(c)
-        ss = g.open_by_key("19E9yyhhzLG58UpCU1Y4HAJsFWxG4AoGtGWVi_DkyQdk")
-        sh = ss.get_worksheet(0)
-        r = sh.get_all_values()
+        s = st.secrets["gcp_service_account"]; sc = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        c = ServiceAccountCredentials.from_json_keyfile_dict(s, sc); g = gspread.authorize(c)
+        ss = g.open_by_key("19E9yyhhzLG58UpCU1Y4HAJsFWxG4AoGtGWVi_DkyQdk"); sh = ss.get_worksheet(0); r = sh.get_all_values()
         if not r or len(r) < 1: return pd.DataFrame(), sh
         df = pd.DataFrame(r[1:], columns=[h.strip() for h in r[0]])
         for cn in [L_TYPE, L1, L2, L3, L8, L12]:
@@ -54,7 +45,6 @@ def load_data():
 df_raw, sh_obj = load_data()
 if 'is_login' not in st.session_state: st.session_state.is_login = False
 
-# --- HEADER ---
 h1, h2 = st.columns([7, 3])
 with h1: st.title("🏢 Vinhomes Manager")
 with h2:
@@ -71,7 +61,6 @@ is_adm = st.session_state.is_login
 
 if sh_obj is not None:
     t1, t2, t3 = st.tabs(["🔴 Bán", "🟢 Thuê", "➕ Thêm"])
-    
     def draw(df_in, ks):
         df_a = df_in[~df_in[L12].astype(str).str.contains("Đã", na=False)]
         if df_a.empty: 
@@ -81,7 +70,6 @@ if sh_obj is not None:
         with cb: lh = st.multiselect(f"Loại hình", LH_L, key=f"l{ks}")
         if pk: df_a = df_a[df_a[L1].isin(pk)]
         if lh: df_a = df_a[df_a[L2].isin(lh)]
-        
         scols = df_a.drop(columns=[L9, L_TYPE, L12, L3] if not is_adm else [L9, L_TYPE, L12], errors='ignore')
         st.write(f"Tìm thấy {len(df_a)} căn")
         sel = st.dataframe(scols, use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row", key=f"d{ks}")
@@ -90,9 +78,14 @@ if sh_obj is not None:
         def show_dt(row):
             c1, c2 = st.columns([1.2, 1])
             with c1:
-                lnks = str(row.get(L9, "")).split(',') if row.get(L9) else []
-                if lnks and lnks[0]:
+                ls = str(row.get(L9, "")).split(',') if row.get(L9) else []
+                if ls and ls[0]:
                     if 'ci' not in st.session_state: st.session_state.ci = 0
-                    idx = st.session_state.ci % len(lnks)
-                    st.image(lnks[idx], use_container_width=True)
-                    if len
+                    ix = st.session_state.ci % len(ls)
+                    st.image(ls[ix], use_container_width=True)
+                    if len(ls) > 1:
+                        b1, b2 = st.columns(2)
+                        with b1: 
+                            if st.button("⬅️", key=f"prev{ks}"): st.session_state.ci -= 1; st.rerun()
+                        with b2:
+                            if st.button("
