@@ -134,16 +134,23 @@ if sh_obj is not None and not df_raw.empty:
     
     def draw(df_in, ks):
         df_a = df_in[~df_in[L_TT].astype(str).str.contains("Đã", na=False)]
-        c1, c2, c3 = st.columns([3, 3, 4])
+        # Tự động điều chỉnh layout cột: Nếu là Bán (B) thì hiện 3 cột, nếu là Thuê (T) thì chỉ hiện 2 cột
+        if ks == "B":
+            c1, c2, c3 = st.columns([3, 3, 4])
+        else:
+            c1, c2 = st.columns([1, 1])
+            
         with c1: pk = st.multiselect("Phân khu", LIST_PK, placeholder="Lựa chọn", key=f"p{ks}")
         with c2: lh = st.multiselect("Loại hình", LIST_LH, placeholder="Lựa chọn", key=f"l{ks}")
-        with c3:
-            # CẬP NHẬT: Dải trượt từ 0.0 đến 10.0 Tỷ
-            r_gia = st.slider("Giá (Tỷ)", 0.0, 10.0, (0.0, 10.0), step=0.1, key=f"g{ks}")
+        
+        if ks == "B":
+            with c3:
+                r_gia = st.slider("Giá (Tỷ)", 0.0, 10.0, (0.0, 10.0), step=0.1, key=f"g{ks}")
+            df_a = df_a[(df_a[L_GIA] >= r_gia[0]) & (df_a[L_GIA] <= r_gia[1])]
         
         if pk: df_a = df_a[df_a[L_PK].isin(pk)]
         if lh: df_a = df_a[df_a[L_LH].isin(lh)]
-        df_a = df_a[(df_a[L_GIA] >= r_gia[0]) & (df_a[L_GIA] <= r_gia[1])]
+        
         st.markdown(f"<div style='padding: 15px 0px; font-weight: bold; font-size: 17px;'>🔍 Đang hiển thị: {len(df_a)} căn hộ phù hợp</div>", unsafe_allow_html=True)
         
         v_cols = [L_DATE, L_LH, L_PK, L_DT, L_GIA, L_TT]
