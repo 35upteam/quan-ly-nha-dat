@@ -5,7 +5,7 @@ import pandas as pd
 
 st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
-# --- DANH MỤC DỮ LIỆU ---
+# --- ĐỊNH NGHĨA NHÃN ---
 L1, L2, L3 = "Phân khu", "Loại hình", "Mã căn"
 L4, L5, L6 = "Diện tích", "Khoảng tầng", "Nội thất"
 L7, L8, L9 = "Hướng BC", "Giá bán", "Link ảnh"
@@ -37,11 +37,10 @@ def load_data():
 
 df_raw, sh_obj = load_data()
 
-# --- TRẠNG THÁI ĐĂNG NHẬP ---
 if 'is_login' not in st.session_state: 
     st.session_state.is_login = False
 
-# --- HEADER TỐI ƯU ---
+# --- HEADER ---
 h1, h2 = st.columns([7, 3])
 with h2:
     s1, s2 = st.columns([5, 1])
@@ -65,7 +64,6 @@ with h2:
 
 is_adm = st.session_state.is_login
 
-# --- DIALOG CHI TIẾT ---
 @st.dialog("📋 Chi tiết")
 def show_dt(row, adm):
     c1, c2 = st.columns(2)
@@ -81,36 +79,29 @@ def show_dt(row, adm):
         t = f"🏢 VINHOMES\n📍 Khu: {row.get(L1)}\n✨ Loại: {row.get(L2)}\n💰 Giá: {row.get(L8)} Tỷ"
         st.code(t)
 
-# --- GIAO DIỆN CHÍNH ---
 st.title("🏢 Kho Hàng Vinhomes")
 
 if sh_obj is not None:
     t1, t2 = st.tabs(["📋 Danh sách", "➕ Thêm hàng"])
-    
     with t1:
         c1, c2, c3 = st.columns(3)
         with c1: pk = st.multiselect(L1, PK_L)
         with c2: lh = st.multiselect(L2, LH_L)
         with c3: pr = st.slider(L8, 0.0, 15.0, (0.0, 15.0), 0.1)
-        
         df = df_raw.copy()
         if pk: df = df[df[L1].isin(pk)]
         if lh: df = df[df[L2].isin(lh)]
         df = df[(df[L8] >= pr[0]) & (df[L8] <= pr[1])]
-        
         d_df = df.drop(columns=[L3]) if L3 in df.columns else df
         st.write(f"Tìm thấy {len(df)} căn")
-        
-        cfg = {"use_container_width": True, "hide_index": True, 
-               "on_select": "rerun", "selection_mode": "single-row"}
+        cfg = {"use_container_width":True, "hide_index":True, "on_select":"rerun", "selection_mode":"single-row"}
         sel = st.dataframe(d_df, **cfg)
-        
         if sel and sel.selection.rows:
             show_dt(df.iloc[sel.selection.rows[0]], is_adm)
 
     with t2:
         if is_adm:
-            with st.form("form_final", clear_on_submit=True):
+            with st.form("form_v9", clear_on_submit=True):
                 st.write("### 📝 Thêm căn hộ mới")
                 i1, i2, i3 = st.columns(3)
                 with i1:
@@ -126,10 +117,27 @@ if sh_obj is not None:
                     v_hb = st.selectbox(L7, H_L)
                     v_gi = st.number_input(L8, 0.0, step=0.01)
                 v_an = st.text_input(L9)
-                
                 if st.form_submit_button("🚀 Lưu"):
                     try:
                         h = [x.strip() for x in sh_obj.row_values(1)]
                         r = [""] * len(h)
-                        dm = { "Ngày lên hàng":str(v_ng), L2:v_lh, L1:v_pk, L3:v_ma, 
-                              L4:v_dt, L5:v_tg, L6:v_
+                        # KHAI BÁO DÒNG ĐƠN (Chống ngắt dòng tuyệt đối)
+                        dm = {}
+                        dm["Ngày lên hàng"] = str(v_ng)
+                        dm[L2] = v_lh
+                        dm[L1] = v_pk
+                        dm[L3] = v_ma
+                        dm[L4] = v_dt
+                        dm[L5] = v_tg
+                        dm[L6] = v_nt
+                        dm[L7] = v_hb
+                        dm[L8] = v_gi
+                        dm[L9] = v_an
+                        dm["Trạng thái"] = "Đang bán"
+                        for i, col in enumerate(h):
+                            if col in dm: r[i] = dm[col]
+                        sh_obj.append_row(r)
+                        st.success("✅ Đã lưu!"); st.cache_resource.clear()
+                    except Exception as e: st.error(e)
+        else:
+            st.warning("🔒 Nhập mật khẩu Admin để thêm hàng.")
