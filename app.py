@@ -16,7 +16,8 @@ def load_data():
         sh = ss.get_worksheet(0)
         raw = sh.get_all_values()
         if not raw or len(raw) < 1: return pd.DataFrame(), sh
-        df = pd.DataFrame(raw[1:], columns=[str(h).strip() for h in raw[0]])
+        cols = [str(h).strip() for h in raw[0]]
+        df = pd.DataFrame(raw[1:], columns=cols)
         if "Giá bán" in df.columns:
             df["Giá bán"] = pd.to_numeric(df["Giá bán"].astype(str).str.replace(',', '.'), errors='coerce').fillna(0)
         return df.iloc[::-1].reset_index(drop=True), sh
@@ -51,18 +52,17 @@ if sheet_obj is not None:
         df = df[(df['Giá bán'] >= pr_f[0]) & (df['Giá bán'] <= pr_f[1])]
 
         st.write(f"🔍 Tìm thấy **{len(df)}** căn")
-        # Sử dụng selection_mode="single-row" để chọn căn hộ
         sel = st.dataframe(df, use_container_width=True, hide_index=True, on_select="rerun", selection_mode="single-row")
 
         if sel and sel.selection.rows:
-            idx = sel.selection.rows[0]
-            row = df.iloc[idx]
+            row = df.iloc[sel.selection.rows[0]]
             
-            # Chuẩn bị nội dung để copy
+            # Nội dung copy có thêm Diện tích
             copy_text = (
                 f"🏢 CĂN HỘ VINHOMES SMART CITY\n"
                 f"📍 Phân khu: {row.get('Phân khu')}\n"
                 f"✨ Loại hình: {row.get('Loại hình')}\n"
+                f"📐 Diện tích: {row.get('Diện tích')} m2\n"
                 f"🧭 Hướng: {row.get('Hướng BC')}\n"
                 f"🛋️ Nội thất: {row.get('Nội thất')}\n"
                 f"💰 Giá bán: {row.get('Giá bán', 0):.2f} Tỷ\n"
@@ -75,18 +75,14 @@ if sheet_obj is not None:
                 if row.get('Link ảnh'): st.image(row['Link ảnh'], use_container_width=True)
                 else: st.info("Chưa có ảnh")
             with col_b:
-                st.subheader(f"Chi tiết: {row.get('Loại hình')} - {row.get('Phân khu')}")
-                # Nút copy tích hợp sẵn của Streamlit
+                st.subheader(f"{row.get('Loại hình')} - {row.get('Phân khu')} ({row.get('Diện tích')} m2)")
                 st.code(copy_text, language="text")
-                st.info("💡 Bạn hãy bôi đen đoạn mã trên hoặc nhấn biểu tượng copy ở góc phải ô văn bản.")
-                
-                if is_admin:
-                    st.error(f"🔑 MÃ CĂN HỘ: {row.get('Mã căn')}")
+                st.markdown(f"💰 Giá bán: **{row.get('Giá bán',0):.2f} Tỷ**")
+                if is_admin: st.error(f"🔑 MÃ CĂN: {row.get('Mã căn')}")
 
     with t2:
         if is_admin:
             with st.form("add_form", clear_on_submit=True):
-                # ... (Giữ nguyên phần form thêm hàng như cũ)
                 st.write("### 📝 Nhập thông tin căn hộ")
                 f1, f2, f3 = st.columns(3)
                 with f1:
@@ -95,17 +91,25 @@ if sheet_obj is not None:
                     pkn = st.selectbox("Phân khu", ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
                 with f2:
                     ma = st.text_input("Mã căn")
+                    # THÊM TRƯỜNG DIỆN TÍCH
+                    dtich = st.number_input("Diện tích (m2)", min_value=0.0, step=0.1)
                     tg = st.selectbox("Tầng", ["Thấp", "Trung", "Cao"])
-                    nt = st.selectbox("Nội thất", ["Nguyên bản", "Cơ bản", "Full đồ"])
                 with f3:
+                    nt = st.selectbox("Nội thất", ["Nguyên bản", "Cơ bản", "Full đồ"])
                     hbc = st.selectbox("Hướng", ["Đông", "Tây", "Nam", "Bắc", "Đông Bắc", "Đông Nam", "Tây Bắc", "Tây Nam"])
                     gia = st.number_input("Giá (Tỷ)", min_value=0.0, step=0.01)
                     anh = st.text_input("Link ảnh")
+                
                 if st.form_submit_button("🚀 Lưu"):
                     try:
                         h_list = sheet_obj.row_values(1)
                         new_row = [""] * len(h_list)
-                        m = {"Ngày lên hàng": str(ngay), "Loại hình": loai, "Phân khu": pkn, "Mã căn": ma, "Khoảng tầng": tg, "Nội thất": nt, "Hướng BC": hbc, "Giá bán": gia, "Link ảnh": anh, "Trạng thái": "Đang bán"}
+                        m = {
+                            "Ngày lên hàng": str(ngay), "Loại hình": loai, "Phân khu": pkn, 
+                            "Mã căn": ma, "Diện tích": dtich, "Khoảng tầng": tg, 
+                            "Nội thất": nt, "Hướng BC": hbc, "Giá bán": gia, 
+                            "Link ảnh": anh, "Trạng thái": "Đang bán"
+                        }
                         for i, h in enumerate(h_list):
                             if h.strip() in m: new_row[i] = m[h.strip()]
                         sheet_obj.append_row(new_row)
@@ -113,4 +117,4 @@ if sheet_obj is not None:
                         st.cache_resource.clear()
                     except Exception as e: st.error(f"Lỗi: {e}")
         else:
-            st.warning("Vui lòng nhập mật khẩu Admin.")
+            st.warning("Nhập mật khẩu Admin để thêm hàng.")
