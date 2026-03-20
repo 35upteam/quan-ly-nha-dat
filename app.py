@@ -2,21 +2,29 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
-import requests, base64, time, urllib.parse
+import requests, base64, time
 
-st.set_page_config(page_title="Vinhomes Manager", layout="wide", page_icon="🏢")
+st.set_page_config(page_title="Vinhomes Manager", layout="wide")
 
-# --- BIẾN ĐIỀU HƯỚNG ---
-K_BAN = "Bán|Ban|bán|ban"
-K_THUE = "Thuê|Thue|thuê|thue"
-MY_ZALO = "0900000000" # <-- THAY SỐ ĐIỆN THOẠI CỦA BẠN VÀO ĐÂY
-
-# --- NHÃN CỘT ---
+# --- KHAI BÁO NHÃN ---
 L_DATE, L_LH, L_PK, L_MA = "Ngày lên hàng", "Loại hình", "Phân khu", "Mã căn"
 L_DT, L_TANG, L_NT, L_HBC = "Diện tích", "Khoảng tầng", "Nội thất", "Hướng BC"
 L_GIA, L_HT, L_TT, L_IMG = "Giá bán", "Hiện trạng", "Trạng thái", "Link ảnh"
 L_TYPE, L_GC = "Phân loại", "Ghi chú"
 V_SOLD, V_RENT = "Đã bán", "Đã thuê"
+
+# --- HÀM TRỢ GIÚP ---
+def up_img(fs):
+    if not fs: return ""
+    try:
+        ak = st.secrets.get("imgbb_api_key")
+        res = []
+        for f in fs:
+            f.seek(0); b6 = base64.b64encode(f.read()).decode('utf-8')
+            r = requests.post("https://api.imgbb.com/1/upload", {"key": ak, "image": b6}, timeout=20)
+            if r.status_code == 200: res.append(r.json()['data']['thumb']['url']) 
+        return ",".join(res)
+    except: return ""
 
 @st.cache_resource
 def load_data():
@@ -34,43 +42,11 @@ def load_data():
     except: return pd.DataFrame(), None
 
 df_raw, sh_obj = load_data()
-
-# --- XỬ LÝ CHẾ ĐỘ VIEW CHO KHÁCH ---
-q = st.query_params
-gid = q.get("id")
-
-if gid and not df_raw.empty:
-    r = df_raw[df_raw[L_MA] == gid]
-    if not r.empty:
-        row = r.iloc[0]
-        st.write(f"### 🏠 Căn hộ {row[L_PK]}")
-        c1, c2 = st.columns([1.5, 1])
-        with c1:
-            imgs = str(row.get(L_IMG, "")).split(',') if row.get(L_IMG) else []
-            if imgs and imgs[0]:
-                if 'gci' not in st.session_state: st.session_state.gci = 0
-                ix = st.session_state.gci % len(imgs); st.image(imgs[ix], use_container_width=True)
-                if len(imgs) > 1:
-                    b1, b2 = st.columns(2)
-                    with b1:
-                        if st.button("⬅️"): st.session_state.gci -= 1; st.rerun()
-                    with b2:
-                        if st.button("Sau ➡️"): st.session_state.gci += 1; st.rerun()
-        with c2:
-            st.header(f"💰 {row[L_GIA]} Tỷ")
-            st.write(f"📍 **{row[L_LH]} - {row[L_PK]}**")
-            st.divider()
-            st.write(f"📐 Diện tích: {row[L_DT]}m² | 🧭 Hướng: {row[L_HBC]}")
-            st.write(f"🛋️ Nội thất: {row[L_NT]} | 🧱 Tầng: {row[L_TANG]}")
-            if row.get(L_GC): st.info(f"Ghi chú: {row[L_GC]}")
-            st.link_button("💬 LIÊN HỆ QUA ZALO NGAY", f"https://zalo.me/{MY_ZALO}", type="primary", use_container_width=True)
-        st.stop()
-
-# --- GIAO DIỆN QUẢN LÝ ---
 if 'is_login' not in st.session_state: st.session_state.is_login = False
 is_adm = st.session_state.is_login
 
-@st.dialog("Chi tiết & Gửi khách")
+# --- DIALOG CHI TIẾT ---
+@st.dialog("Chi tiết căn hộ")
 def show_dt(row, ks):
     mid = str(row.get(L_MA, "0"))
     cl1, cl2 = st.columns([1.2, 1])
@@ -82,16 +58,22 @@ def show_dt(row, ks):
             if len(imgs) > 1:
                 b1, b2 = st.columns(2)
                 with b1:
-                    if st.button("⬅️", key=f"p_{mid}"): st.session_state.ci -= 1; st.rerun()
+                    if st.button("⬅️ Trước", key=f"p_{mid}"): 
+                        st.session_state.ci = (st.session_state.ci - 1) % len(imgs)
+                        st.rerun()
                 with b2:
-                    if st.button("➡️", key=f"n_{mid}"): st.session_state.ci += 1; st.rerun()
+                    if st.button("Sau ➡️", key=f"n_{mid}"): 
+                        st.session_state.ci = (st.session_state.ci + 1) % len(imgs)
+                        st.rerun()
+        else: st.info("Không có ảnh")
     with cl2:
         st.subheader(f"{row[L_LH]} - {row[L_PK]}")
-        st.success(f"{row[L_GIA]} Tỷ")
-        
-        # Link gửi khách (Lấy URL hiện tại tự động)
-        share_url = f"https://quan-ly-nha-dat.streamlit.app/?id={mid}"
-        st.text_input("Link gửi khách:", value=share_url)
+        st.success(f"💰 Giá: {row[L_GIA]} Tỷ")
+        st.write(f"📐 **Diện tích:** {row[L_DT]}m²")
+        st.write(f"🧭 **Hướng BC:** {row[L_HBC]}")
+        st.write(f"🧱 **Tầng:** {row[L_TANG]} | **Nội thất:** {row[L_NT]}")
+        st.write(f"🚧 **Hiện trạng:** {row[L_HT]}")
+        if row.get(L_GC): st.info(f"Ghi chú: {row[L_GC]}")
         
         if is_adm:
             st.divider(); ck = f"ck_{mid}"
@@ -99,17 +81,18 @@ def show_dt(row, ks):
                 if st.button("✅ ĐÃ CHỐT", use_container_width=True, type="primary", key=f"bt_{mid}"):
                     st.session_state[ck] = True; st.rerun()
             else:
-                st.warning("Xác nhận?"); cy, cn = st.columns(2)
+                st.warning("Xác nhận chốt?"); cy, cn = st.columns(2)
                 with cy:
-                    if st.button("OK", type="primary", key=f"ok_{mid}"):
+                    if st.button("OK", type="primary", use_container_width=True, key=f"ok_{mid}"):
                         c_idx = list(df_raw.columns).index(L_TT) + 1
                         sh_obj.update_cell(int(row['sheet_row']), c_idx, V_SOLD if ks=="B" else V_RENT)
                         st.session_state[ck] = False; st.cache_resource.clear(); st.rerun()
                 with cn:
-                    if st.button("Hủy", key=f"no_{mid}"): st.session_state[ck] = False; st.rerun()
+                    if st.button("Hủy", use_container_width=True, key=f"no_{mid}"):
+                        st.session_state[ck] = False; st.rerun()
         st.code(f"Mã: {mid if is_adm else 'Ẩn'}")
 
-# --- PHẦN CHÍNH ---
+# --- GIAO DIỆN CHÍNH ---
 st.title("🏢 Vinhomes Manager")
 if not is_adm:
     p = st.text_input("Admin", type="password")
@@ -117,13 +100,14 @@ if not is_adm:
 else:
     if st.button("Thoát Admin"): st.session_state.is_login = False; st.rerun()
 
-if not df_raw.empty:
-    t1, t2 = st.tabs(["🔴 Bán", "🟢 Thuê"])
+if sh_obj is not None and not df_raw.empty:
+    t1, t2, t3 = st.tabs(["🔴 Chuyển nhượng", "🟢 Cho thuê", "➕ Thêm hàng"])
+    
     def draw(df_in, ks):
         df_a = df_in[~df_in[L_TT].astype(str).str.contains("Đã", na=False)]
         c1, c2, c3 = st.columns([3, 3, 4])
         with c1: pk = st.multiselect("Phân khu", sorted(df_in[L_PK].unique()), key=f"p{ks}")
-        with c2: lh = st.multiselect("Loại", sorted(df_in[L_LH].unique()), key=f"l{ks}")
+        with c2: lh = st.multiselect("Loại hình", sorted(df_in[L_LH].unique()), key=f"l{ks}")
         with c3:
             mi, ma = float(df_in[L_GIA].min()), float(df_in[L_GIA].max())
             r_gia = st.slider("Giá (Tỷ)", mi, ma, (mi, ma), key=f"g{ks}")
@@ -138,5 +122,30 @@ if not df_raw.empty:
         if sel and sel.selection.rows:
             st.session_state.ci = 0; show_dt(df_a.iloc[sel.selection.rows[0]], ks)
 
-    with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains(K_BAN, na=False)], "B")
-    with t2: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains(K_THUE, na=False)], "T")
+    with t1: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Bán|Ban", na=False)], "B")
+    with t2: draw(df_raw[df_raw[L_TYPE].astype(str).str.contains("Thuê|Thue", na=False)], "T")
+    with t3:
+        if is_adm:
+            with st.form("f_add", clear_on_submit=True):
+                tp = st.radio("Loại", ["Bán", "Cho thuê"], horizontal=True)
+                i1, i2, i3 = st.columns(3)
+                with i1:
+                    v_lh = st.selectbox(L_LH, ["Studio", "1PN+", "2PN", "2PN+", "3N"])
+                    v_ma = st.text_input(L_MA)
+                with i2:
+                    v_pk = st.selectbox(L_PK, ["S", "SA", "GS", "Mas", "Tonkin", "Canopy", "I", "Sola", "VIC"])
+                    v_dt = st.number_input(L_DT, 0.0)
+                with i3:
+                    v_gi = st.number_input(L_GIA, step=0.1)
+                    v_ht = st.selectbox(L_HT, ["Đang ở", "Để trống", "Cho thuê"])
+                v_gc = st.text_input(L_GC); up = st.file_uploader("Ảnh", accept_multiple_files=True)
+                if st.form_submit_button("🚀 ĐĂNG CĂN"):
+                    if v_ma:
+                        imgs = up_img(up)
+                        try:
+                            h = list(df_raw.columns); row_d = [""] * len(h)
+                            dm = {L_TYPE:tp, L_DATE:str(pd.Timestamp.now().date()), L_LH:v_lh, L_PK:v_pk, L_MA:v_ma, L_DT:v_dt, L_GIA:v_gi, L_HT:v_ht, L_GC:v_gc, L_TT:"Đang bán", L_IMG:imgs}
+                            for i, col in enumerate(h):
+                                if col in dm: row_d[i] = dm[col]
+                            sh_obj.append_row(row_d); st.cache_resource.clear(); st.rerun()
+                        except: st.error("Lỗi Sheets")
